@@ -1,0 +1,21 @@
+# Virtual Environments
+venv_models/
+venv_benchmark/
+venv*/
+env/
+.venv/
+
+# Large Model Weights (YOLO / PyTorch models)
+*.pt
+*.onnx
+*.engine
+Models_yolo/
+
+# Python Cache & Outputs
+__pycache__/
+*.pyc
+Outputs/
+.ipynb_checkpoints/
+
+# Environment / API Keys
+.env
