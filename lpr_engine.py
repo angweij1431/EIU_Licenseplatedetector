@@ -170,8 +170,7 @@ class EasyOCRAdapter(BaseOCR):
 # Unified License Plate Recognition pipeline
 class LPRPipeline:
     # Composes detector, OCR adapter, preprocessing flag, and optional fallback detector
-    def __init__(self, detector: BaseDetector, ocr: BaseOCR, enable_preprocessing: bool = True,
-                 fallback_detector: BaseDetector = None):
+    def __init__(self, detector: BaseDetector, ocr: BaseOCR, enable_preprocessing: bool = True, fallback_detector: BaseDetector = None):
         self.detector = detector
         self.ocr = ocr
         self.enable_preprocessing = enable_preprocessing
