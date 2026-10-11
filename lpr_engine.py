@@ -6,82 +6,63 @@ import psutil
 import cv2
 import numpy as np
 
-# Import our image preprocessor & validator
+# Import preprocessing and validation modules
 from lpr_core.preprocessor import PlatePreprocessor
 from lpr_core.validator import VietnamPlateValidator
 
-# Ensure Windows UTF-8 console output
+# Import-level fallback for Windows console encoding
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
     except Exception:
         pass
 
-# Ensure 'Outputs' folder exists for storing output images
+# Output directory for saving visualizations and preprocessed crops
 OUTPUTS_DIR = "Outputs"
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
+# Memory tracking helper (measures resident set size in megabytes)
 def get_ram_usage_mb():
-    """Utility function to measure current process memory usage."""
     process = psutil.Process(os.getpid())
     return process.memory_info().rss / (1024 * 1024)
 
-# Default vehicle classes to focus ONLY on vehicles & plates
-VEHICLE_CLASSES = ['car', 'motorcycle', 'bus', 'truck', 'license_plate']
+# Vehicle target classes for object filtering
+VEHICLE_CLASSES = ['car', 'motorcycle', 'bus', 'truck', 'license_plate', 'plate']
 
 
-# =====================================================================
-# 1. ABSTRACT BASE CLASSES (Modular Interfaces)
-# =====================================================================
-
+# Abstract base class for detection models
 class BaseDetector(ABC):
-    """Abstract interface for Vehicle / License Plate Detectors."""
-    
     @abstractmethod
     def detect(self, image_path: str):
-        """
-        Returns:
-            list[dict]: List of detections:
-                        { 'class': str, 'confidence': float, 'box': [x1, y1, x2, y2] }
-        """
         pass
 
 
+# Abstract base class for optical character recognition models
 class BaseOCR(ABC):
-    """Abstract interface for Character Recognition engines."""
-    
     @abstractmethod
     def recognize(self, image_crop: np.ndarray):
-        """
-        Returns:
-            list[dict]: List of recognized text entries:
-                        { 'text': str, 'confidence': float }
-        """
         pass
 
 
-# =====================================================================
-# 2. CONCRETE DETECTION MODEL ADAPTERS
-# =====================================================================
-
+# Ultralytics YOLO detector adapter
 class YOLOv8Detector(BaseDetector):
-    """
-    Adapter for Ultralytics YOLOv8 / YOLO11 models.
-    Supports filtering by target classes and confidence thresholding.
-    """
-    
-    def __init__(self, model_weights: str = "yolov8n.pt", 
+    # Initializes detector with model weights, target class filter, and confidence threshold
+    def __init__(self, model_weights: str = "Models_yolo/yolov8n.pt", 
                  target_classes: list = VEHICLE_CLASSES, 
-                 confidence_threshold: float = 0.35):
+                 confidence_threshold: float = 0.03):
         from ultralytics import YOLO
         self.model_name = model_weights
         self.target_classes = target_classes
         self.confidence_threshold = confidence_threshold
-        print(f"[YOLOv8Detector] Loading '{model_weights}' (Filter: {target_classes}, Conf >= {confidence_threshold})...")
+        print(f"Loading detector weights: {model_weights} (confidence threshold: {confidence_threshold})")
         self.model = YOLO(model_weights)
         
+    # Detects objects in image path and returns bounding boxes
     def detect(self, image_path: str):
-        results = self.model(image_path, conf=self.confidence_threshold, verbose=False)
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Detection image path not found: {image_path}")
+            
+        results = self.model(image_path, conf=self.confidence_threshold, imgsz=1024, verbose=False) # fix: to increase image resolution for better detection accuracy
         detections = []
         for r in results:
             boxes = r.boxes
@@ -90,7 +71,7 @@ class YOLOv8Detector(BaseDetector):
                 cls_name = self.model.names[cls_id]
                 conf = float(b.conf[0])
                 
-                # Filter by target classes if specified
+                # Filter out detections not in target classes if target_classes is set
                 if self.target_classes is not None and cls_name not in self.target_classes:
                     continue
                     
@@ -103,57 +84,82 @@ class YOLOv8Detector(BaseDetector):
         return detections
 
 
-# =====================================================================
-# 3. CONCRETE OCR MODEL ADAPTERS
-# =====================================================================
-
+# PaddleOCR model adapter
 class PaddleOCRAdapter(BaseOCR):
-    """Adapter for PaddlePaddle-native PaddleOCR engine."""
-    
+    # Initializes PaddleOCR with streamlined settings (disabling doc unwarping and rotation overhead)
     def __init__(self, lang: str = 'en'):
         import torch
         from paddleocr import PaddleOCR
-        print(f"[PaddleOCRAdapter] Initializing PaddleOCR (lang={lang}, enable_mkldnn=False)...")
-        self.ocr_model = PaddleOCR(enable_mkldnn=False, lang=lang)
+        print(f"Initializing PaddleOCR (language: {lang}, streamlined: True)")
+        self.ocr_model = PaddleOCR(
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False,
+            enable_mkldnn=False,
+            lang=lang
+        )
         
+    # Performs text recognition on a cropped plate image
     def recognize(self, image_crop: np.ndarray):
+        if image_crop is None or image_crop.size == 0:
+            raise ValueError("Input image crop to PaddleOCR is empty")
+            
         temp_crop_path = "_temp_crop.jpg"
         cv2.imwrite(temp_crop_path, image_crop)
         
-        predict_res = list(self.ocr_model.predict(temp_crop_path))
+        try:
+            predict_res = list(self.ocr_model.predict(temp_crop_path))
+        except Exception as e:
+            if os.path.exists(temp_crop_path):
+                os.remove(temp_crop_path)
+            raise RuntimeError(f"PaddleOCR recognition failed: {e}")
+            
         ocr_entries = []
         for item in predict_res:
             if isinstance(item, dict):
                 texts = item.get('rec_texts', [])
                 scores = item.get('rec_scores', [])
-                for txt, score in zip(texts, scores):
-                    ocr_entries.append({
-                        'text': txt,
-                        'confidence': float(score)
-                    })
+                boxes = item.get('rec_boxes', [])
+                
+                # Pair text, score, and box coordinates together
+                paired = []
+                for idx, (txt, score) in enumerate(zip(texts, scores)):
+                    # Calculate vertical center (y_center) for reading order sorting
+                    if idx < len(boxes) and len(boxes[idx]) >= 4:
+                        y_center = (boxes[idx][1] + boxes[idx][3]) / 2.0
+                    else:
+                        y_center = float(idx)
+                    paired.append({'text': txt, 'confidence': float(score), 'y_center': y_center})
+                
+                # Sort top-to-bottom so Line 1 always precedes Line 2 on 2-line plates
+                paired = sorted(paired, key=lambda x: x['y_center'])
+                for p in paired:
+                    ocr_entries.append({'text': p['text'], 'confidence': p['confidence']})
         
         if os.path.exists(temp_crop_path):
-            try:
-                os.remove(temp_crop_path)
-            except Exception:
-                pass
+            os.remove(temp_crop_path)
             
         return ocr_entries
 
 
+# EasyOCR model adapter
 class EasyOCRAdapter(BaseOCR):
-    """Adapter for PyTorch-native EasyOCR engine."""
-    
+    # Initializes EasyOCR reader
     def __init__(self, lang_list: list = ['en'], gpu: bool = False):
         import easyocr
-        print(f"[EasyOCRAdapter] Initializing EasyOCR (langs={lang_list}, gpu={gpu})...")
+        print(f"Initializing EasyOCR (languages: {lang_list}, gpu: {gpu})")
         self.reader = easyocr.Reader(lang_list, gpu=gpu)
         
+    # Performs text recognition on image crop
     def recognize(self, image_crop: np.ndarray):
+        if image_crop is None or image_crop.size == 0:
+            raise ValueError("Input image crop to EasyOCR is empty")
+            
         results = self.reader.readtext(image_crop)
         ocr_entries = []
         for res in results:
-            bbox, text, conf = res[0], res[1], float(res[2])
+            # Unpack text and confidence directly without storing unused bbox
+            text, conf = res[1], float(res[2])
             ocr_entries.append({
                 'text': text,
                 'confidence': conf
@@ -161,42 +167,46 @@ class EasyOCRAdapter(BaseOCR):
         return ocr_entries
 
 
-# =====================================================================
-# 4. UNIFIED LPR PIPELINE RUNNER (WITH AUTOMATIC PREPROCESSING)
-# =====================================================================
-
+# Unified License Plate Recognition pipeline
 class LPRPipeline:
-    """Unified LPR Engine combining any BaseDetector and any BaseOCR implementation."""
-    
-    def __init__(self, detector: BaseDetector, ocr: BaseOCR, enable_preprocessing: bool = True):
+    # Composes detector, OCR adapter, preprocessing flag, and optional fallback detector
+    def __init__(self, detector: BaseDetector, ocr: BaseOCR, enable_preprocessing: bool = True,
+                 fallback_detector: BaseDetector = None):
         self.detector = detector
         self.ocr = ocr
         self.enable_preprocessing = enable_preprocessing
+        self.fallback_detector = fallback_detector
         
+    # Executes detection, cropping, preprocessing, OCR, and validation
     def process(self, image_path: str, save_annotated_name: str = "output_annotated.jpg", 
-                sort_by: str = 'front', primary_only: bool = True, padding_percent: float = 0.05):
-        """
-        Processes any input image path through Detection -> CLAHE/Bilateral Preprocessing -> OCR -> RegEx Validation.
-        """
+                sort_by: str = 'front', primary_only: bool = True, padding_percent: float = 0.20):
         start_time = time.time()
-        start_ram = get_ram_usage_mb()
-        
         output_file_path = os.path.join(OUTPUTS_DIR, os.path.basename(save_annotated_name))
+        crop_identifier = os.path.splitext(os.path.basename(save_annotated_name))[0]
         
-        print("\n" + "=" * 60)
-        print(f"RUNNING LPR PIPELINE ON IMAGE: '{image_path}'")
+        print(f"Processing image: {image_path}")
         print(f"Detector: {self.detector.__class__.__name__} | OCR: {self.ocr.__class__.__name__}")
-        print(f"Preprocess Enchancement: {'ENABLED (CLAHE+Bilateral)' if self.enable_preprocessing else 'DISABLED'}")
-        print("=" * 60)
+        print(f"Preprocessing enhancement: {self.enable_preprocessing}")
         
-        # Step 1: Detect objects / ROIs
+        # Step 1: Object detection
         det_start = time.time()
         detections = self.detector.detect(image_path)
+        
+        # If primary detector detects nothing, log notice and attempt fallback detector if configured
+        if not detections:
+            print("Notice: Pretrained model did not detect any license plate.")
+            if self.fallback_detector is not None:
+                print("Running fallback to base vehicle detector...")
+                detections = self.fallback_detector.detect(image_path)
+                if detections:
+                    print(f"Fallback detector succeeded: Found {len(detections)} vehicle(s)")
+                else:
+                    print("Warning: Fallback detector also found 0 detections.")
+        
         det_latency_ms = (time.time() - det_start) * 1000
+        print(f"Detection completed in {det_latency_ms:.2f} ms with {len(detections)} detection(s)")
         
-        print(f"  [1. Detection] Found {len(detections)} vehicle(s) in {det_latency_ms:.2f} ms")
-        
-        # Proximity sorting (bottom y2 coordinate)
+        # Proximity sorting by lowest y2 coordinate (closest vehicle in front)
         if detections:
             if sort_by == 'front':
                 detections = sorted(detections, key=lambda d: d['box'][3], reverse=True)
@@ -208,15 +218,12 @@ class LPRPipeline:
         if primary_only and detections:
             primary_vehicle = detections[0]
             detections = [primary_vehicle]
-            print(f"  [Proximity Priority] Selected Closest Vehicle in Front: Class '{primary_vehicle['class']}' | Bottom y2={primary_vehicle['box'][3]}")
+            print(f"Selected primary target: Class '{primary_vehicle['class']}' | Conf: {primary_vehicle['confidence']:.2f} | BBox: {primary_vehicle['box']}")
 
-        for idx, d in enumerate(detections):
-            print(f"      ({idx+1}) Class: '{d['class']}' | Conf: {d['confidence']:.2f} | BBox: {d['box']}")
-            
-        # Step 2: Read image and prepare annotated visualization
+        # Step 2: Read image for cropping and visualization
         img = cv2.imread(image_path)
         if img is None:
-            raise FileNotFoundError(f"Image not found at path: '{image_path}'")
+            raise FileNotFoundError(f"Failed to read image at path: {image_path}")
             
         annotated_img = img.copy()
         ocr_results = []
@@ -226,56 +233,53 @@ class LPRPipeline:
             for idx, d in enumerate(detections):
                 x1, y1, x2, y2 = map(int, d['box'])
                 
+                # Expand crop bounding box with padding (minimum 20px horizontal, 15px vertical to avoid clipping edge characters)
                 h, w, _ = img.shape
-                pad_w = int((x2 - x1) * padding_percent)
-                pad_h = int((y2 - y1) * padding_percent)
+                pad_w = max(20, int((x2 - x1) * padding_percent))
+                pad_h = max(15, int((y2 - y1) * padding_percent))
                 
                 crop_x1 = max(0, x1 - pad_w)
                 crop_y1 = max(0, y1 - pad_h)
                 crop_x2 = min(w, x2 + pad_w)
                 crop_y2 = min(h, y2 + pad_h)
                 
+                # Draw detection rectangle on visualization copy
                 cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 label_text = f"#{idx+1} {d['class']} {d['confidence']:.2f}"
                 cv2.putText(annotated_img, label_text, (x1, max(15, y1 - 5)), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
                 
-                # Crop region
+                # Crop bounding box region from original image
                 crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
                 if crop.size > 0:
-                    # 📚 ENHANCED CROP INTEGRATION: Pass crop through CLAHE + Bilateral Denoising
+                    # Apply CLAHE and Bilateral filter if preprocessing is enabled
                     if self.enable_preprocessing:
                         crop = PlatePreprocessor.enhance_for_ocr(crop)
                         
+                    # Save the preprocessed image for inspection
+                    preprocessed_filename = f"preprocessed_output_{crop_identifier}_{idx+1}.jpg"
+                    preprocessed_path = os.path.join(OUTPUTS_DIR, preprocessed_filename)
+                    cv2.imwrite(preprocessed_path, crop)
+                    print(f"Preprocessed crop saved: {preprocessed_path}")
+                        
                     raw_text_results = self.ocr.recognize(crop)
                     
-                    # Pass through Vietnamese RegEx Validator
+                    # Validate extracted text against Vietnamese license plate formats
                     for res in raw_text_results:
                         val_res = VietnamPlateValidator.clean_and_correct(res['text'])
                         res['validated_text'] = val_res['text']
                         res['is_valid'] = val_res['is_valid']
                         ocr_results.append(res)
         else:
-            print("  [Notice] No vehicle bounding boxes detected. Running OCR on entire image...")
-            crop = img
-            if self.enable_preprocessing:
-                crop = PlatePreprocessor.enhance_for_ocr(crop)
-            raw_text_results = self.ocr.recognize(crop)
-            for res in raw_text_results:
-                val_res = VietnamPlateValidator.clean_and_correct(res['text'])
-                res['validated_text'] = val_res['text']
-                res['is_valid'] = val_res['is_valid']
-                ocr_results.append(res)
+            print("No bounding boxes detected. Skipping OCR to prevent false positives.")
             
         ocr_latency_ms = (time.time() - ocr_start) * 1000
-        
-        print(f"  [2. OCR Recognition] Extracted {len(ocr_results)} text string(s) in {ocr_latency_ms:.2f} ms")
+        print(f"OCR completed in {ocr_latency_ms:.2f} ms with {len(ocr_results)} text result(s)")
         for res in ocr_results:
-            print(f"      * Raw: '{res['text']}' -> Validated: '{res['validated_text']}' | Confidence: {res['confidence']:.4f} ({res['confidence']*100:.2f}%)")
+            print(f"Raw: '{res['text']}' -> Validated: '{res['validated_text']}' | Confidence: {res['confidence']:.4f}")
             
-        if output_file_path:
-            cv2.imwrite(output_file_path, annotated_img)
-            print(f"\n  [Visual Output] Saved visualization to '{output_file_path}'")
+        cv2.imwrite(output_file_path, annotated_img)
+        print(f"Visualization saved to: {output_file_path}")
 
         total_time_s = time.time() - start_time
         end_ram = get_ram_usage_mb()

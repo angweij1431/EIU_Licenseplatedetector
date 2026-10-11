@@ -1,0 +1,4 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}\\venv_models\\Scripts\\python.exe"
+}
+

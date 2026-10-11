@@ -1,50 +1,106 @@
 import os
 import sys
+import time
 import argparse
-import numpy as np
-import cv2
+import glob
+from datetime import datetime
 
-# Import modular adapters from lpr_engine.py
+# Import modular pipeline adapters from lpr_engine
 from lpr_engine import (
     YOLOv8Detector, 
-    PaddleOCRAdapter,
-    EasyOCRAdapter,
+    PaddleOCRAdapter, 
     LPRPipeline
 )
+from lpr_core.validator import VietnamPlateValidator
 
-# Parse command line argument for any image file path at will
-parser = argparse.ArgumentParser(description="Run LPR Pipeline Benchmark on Any Image")
-parser.add_argument("image", nargs="?", default="car_test_2.jpg", help="Path to input vehicle image (default: car_test_2.jpg)")
+# Parse command line argument for vehicle test image or directory path
+parser = argparse.ArgumentParser(description="Run LPR Pipeline Benchmark on an Image or Directory of Images")
+parser.add_argument("input_path", nargs="?", default="test_images/car_test_3.jpg", help="Path to input image or directory (default: test_images/car_test_3.jpg)")
 args = parser.parse_args()
 
-test_img_path = args.image
+target_path = args.input_path
+if not os.path.exists(target_path):
+    raise FileNotFoundError(f"Target path not found: {target_path}")
 
-if not os.path.exists(test_img_path):
-    print(f"❌ Error: Image '{test_img_path}' not found.")
-    sys.exit(1)
-
-print("=" * 60)
-print(f"MODULAR LPR BENCHMARK RUNNER ON IMAGE: '{test_img_path}'")
-print("Detector: YOLOv8 | OCR: PaddleOCR | Preprocessing: CLAHE+Bilateral")
-print("=" * 60)
-
-# Build Pipeline with PaddleOCR as default
-detector = YOLOv8Detector("yolov8n.pt")
+# Initialize detector and OCR adapters
+model_path = "Models_yolo/best.pt" if os.path.exists("Models_yolo/best.pt") else "Models_yolo/yolov8n.pt"
+detector = YOLOv8Detector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.10)
 ocr = PaddleOCRAdapter(lang='en')
-
 pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
 
-# Process target image and save visualization output
-summary = pipeline.process(test_img_path, save_annotated_name="output_annotated.jpg", primary_only=True)
+# Determine whether input is a single file or a directory
+if os.path.isdir(target_path):
+    extensions = ('*.jpg', '*.jpeg', '*.png', '*.bmp')
+    image_files = []
+    for ext in extensions:
+        image_files.extend(glob.glob(os.path.join(target_path, ext)))
+        image_files.extend(glob.glob(os.path.join(target_path, ext.upper())))
+    image_files = sorted(list(set(image_files)))
+    if not image_files:
+        print(f"No image files found in directory: {target_path}")
+        sys.exit(0)
+    print(f"Found {len(image_files)} test images in directory: {target_path}")
+else:
+    image_files = [target_path]
 
-print("\n" + "=" * 60)
-print("BENCHMARK SUMMARY")
-print("=" * 60)
-print(f"  * Image Tested          : {test_img_path}")
-print(f"  * Detector Model        : {summary['detector']}")
-print(f"  * OCR Model             : {summary['ocr']}")
-print(f"  * Detection Latency     : {summary['detection_latency_ms']:.2f} ms")
-print(f"  * OCR Latency           : {summary['ocr_latency_ms']:.2f} ms")
-print(f"  * Process RAM Usage     : {summary['ram_usage_mb']:.2f} MB")
-print(f"  * Annotated BBox Output : {summary['annotated_path']}")
-print("=" * 60)
+# Process images and collect results
+results_list = []
+for idx, img_path in enumerate(image_files):
+    print(f"Processing [{idx+1}/{len(image_files)}]: {img_path}")
+    annotated_name = f"output_{os.path.basename(img_path)}"
+    summary = pipeline.process(
+        img_path, 
+        save_annotated_name=annotated_name, 
+        sort_by='front', 
+        primary_only=True, 
+        padding_percent=0.20
+    )
+    
+    extracted_text = "NONE"
+    is_valid = False
+    raw_lines = []
+    if summary['ocr_results']:
+        raw_lines = [r['text'] for r in summary['ocr_results']]
+        val_lines = [r['validated_text'] for r in summary['ocr_results']]
+        joined_text = "-".join(val_lines) if len(val_lines) > 1 else val_lines[0]
+        final_val = VietnamPlateValidator.clean_and_correct(joined_text)
+        extracted_text = final_val['text']
+        is_valid = final_val['is_valid']
+        
+    results_list.append({
+        'image': os.path.basename(img_path),
+        'boxes': len(summary['detections']),
+        'plate': extracted_text,
+        'valid': is_valid,
+        'det_ms': summary['detection_latency_ms'],
+        'ocr_ms': summary['ocr_latency_ms'],
+        'raw': raw_lines
+    })
+
+# Print aggregate summary report
+print("\nBenchmark Summary Report:")
+print(f"{'Image':<20} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
+for r in results_list:
+    valid_str = "YES" if r['valid'] else "NO"
+    print(f"{r['image']:<20} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
+
+# Dynamically record latest run into BENCHMARK_SUMMARY.md
+summary_md_path = "BENCHMARK_SUMMARY.md"
+if os.path.exists(summary_md_path):
+    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(summary_md_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        
+    history_header = "\n## 7. Dynamic Evaluation History\n\n| Timestamp | Test Image | Boxes | Plate Text | Valid Format | Det (ms) | OCR (ms) |\n| :--- | :--- | :---: | :--- | :---: | :---: | :---: |\n"
+    if "## 7. Dynamic Evaluation History" not in content:
+        content += history_header
+        
+    rows_to_add = ""
+    for r in results_list:
+        valid_icon = "YES" if r['valid'] else "NO"
+        rows_to_add += f"| {timestamp_str} | `{r['image']}` | {r['boxes']} | `{r['plate']}` | {valid_icon} | {r['det_ms']:.1f} | {r['ocr_ms']:.1f} |\n"
+        
+    content += rows_to_add
+    with open(summary_md_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"\nEvaluation history logged to: {summary_md_path}")
