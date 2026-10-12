@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 # Import core modules
-from lpr_engine import YOLOv8Detector, PaddleOCRAdapter
+from lpr_engine import YOLODetector, PaddleOCRAdapter
 from lpr_core.preprocessor import PlatePreprocessor
 from lpr_core.validator import VietnamPlateValidator
 
@@ -27,7 +27,7 @@ print(f"Running Preprocessing Comparison on: {image_path}")
 
 # Initialize detector and OCR model
 model_path = "Models_yolo/best.pt" if os.path.exists("Models_yolo/best.pt") else "Models_yolo/yolov8n.pt"
-detector = YOLOv8Detector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.10)
+detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
 ocr = PaddleOCRAdapter(lang='en')
 
 # Load original image
