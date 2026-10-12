@@ -22,25 +22,43 @@ Added a simulation to showcase when a vehicle pulls up to the gate and a student
 
 ```mermaid
 flowchart TD
-    A["Vehicle Arrives at Gate"] --> B["RFID Card Tap Trigger"]
-    B --> C["FastAPI Server - main.py<br/>Receives Transaction Event"]
-    C --> D["1st try: Fast Pass 640px<br/>Natural Crop (Zero Filters)"]
-    
-    D -->|"Plate Found and Valid"| G["Accept 1st try<br/>Fast Sub-200ms"]
-    D -->|"Faint, Missing Line, or 0 Boxes"| E["2nd try: Enhancement and Zoom<br/>CLAHE and Upscale / 1024px"]
-    
-    E -->|"Plate Found and Valid Syntax"| H["Accept 2nd try<br/>Enhanced or Zoom Verified"]
-    E -->|"Minor OCR Noise"| I["3rd try: Format Similarity<br/>Vietnamese Template DDLDDDDD"]
-    E -->|"No Plate Found"| J["Unreadable Plate"]
-    
-    G --> K{"Gate Decision Engine"}
-    H --> K
-    I --> K
-    J --> K
-    
-    K -->|"Valid Student Card and Verified Plate"| L["GATE_OPEN<br/>Barrier Opens Normally"]
-    K -->|"Valid Student Card and Unreadable Plate"| M["GATE_OPEN_FLAGGED CARD_ONLY<br/>Barrier Opens with Guard Audit"]
-    K -->|"Unauthorized RFID Card"| N["ACCESS_DENIED<br/>Barrier Stays Closed"]
+    subgraph Stage_Auth["1. Authentication - FastAPI"]
+        Start["Vehicle Arrives and Taps RFID Card"] --> CardCheck{"Is Card Authorized?"}
+        CardCheck -->|"No (Unknown Card)"| Denied["ACCESS_DENIED<br/>Barrier Stays Closed"]
+    end
+
+    subgraph Stage_YOLO["2. Plate Detection - YOLO11"]
+        CardCheck -->|"Yes (Student Card)"| YOLO1["YOLO11 Standard Scan (640px)<br/>Locates Plate Bounding Box"]
+        YOLO1 --> DetCheck{"Plate Box Found?<br/>Conf >= 0.25"}
+        DetCheck -->|"No (0 Boxes Found)"| YOLO2["YOLO11 Zoom Pass (1024px)<br/>High-Res Full Frame Scan"]
+    end
+
+    subgraph Stage_CV["3. Image Processing - OpenCV"]
+        DetCheck -->|"Yes"| RawCrop["Extract Raw Camera Crop<br/>(Zero Filters)"]
+        YOLO2 --> ZoomCrop["Extract Zoomed Crop"]
+        EnhanceCrop["Adaptive Image Enhancement<br/>(CLAHE + 2.5x Bicubic Upscale)"]
+    end
+
+    subgraph Stage_OCR["4. Character Recognition - PaddleOCR"]
+        RawCrop --> OCR1["PaddleOCR reads Raw Crop<br/>(1st try)"]
+        EnhanceCrop --> OCR2["PaddleOCR reads Enhanced Crop<br/>(2nd try)"]
+        ZoomCrop --> OCR2
+    end
+
+    subgraph Stage_Val["5. Syntax and Format Validation - Validator"]
+        OCR1 --> Val1{"Strict Syntax Valid?<br/>(e.g. 51G-743.72)"}
+        Val1 -->|"No (Faint or Shadowed)"| EnhanceCrop
+        
+        OCR2 --> Val2{"Strict Syntax Valid?<br/>(e.g. 29H-6840)"}
+        Val2 -->|"No (Optical Glare)"| SimCheck{"Template Similarity >= 75%?<br/>(Levenshtein on DDLDDDDD)"}
+    end
+
+    subgraph Stage_Gate["6. Barrier Decision Engine"]
+        Val1 -->|"Yes"| Gate1["GATE_OPEN<br/>Cleared on 1st try (Sub-200ms)"]
+        Val2 -->|"Yes"| Gate2["GATE_OPEN<br/>Cleared on 2nd try (Enhanced)"]
+        SimCheck -->|"Yes"| Gate3["GATE_OPEN<br/>Cleared on 3rd try (Format Match)"]
+        SimCheck -->|"No"| GateFlag["GATE_OPEN_FLAGGED CARD_ONLY<br/>Barrier Opens with Guard Audit"]
+    end
 ```
 
 ### Component Dependency Structure
