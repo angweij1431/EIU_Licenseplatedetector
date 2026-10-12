@@ -30,34 +30,16 @@ class VietnamPlateValidator:
             cleaned_parts.append(p_clean)
         cleaned = "-".join(cleaned_parts)
         
-        # Step 4: Position-Based Character Correction
-        # First 2 characters are ALWAYS numeric province codes (11-99)
-        char_list = list(cleaned)
-        if len(char_list) >= 2:
-            num_map = {
-                'O': '0', 'Q': '0', 'D': '0', 
-                'I': '1', 'L': '1', 
-                'Z': '2', 
-                'B': '8', 
-                'S': '5'
-            }
-            if char_list[0] in num_map:
-                char_list[0] = num_map[char_list[0]]
-            if char_list[1] in num_map:
-                char_list[1] = num_map[char_list[1]]
-                
-        corrected_text = "".join(char_list)
-        
-        # Step 5: Validate against official Vietnamese syntax patterns
+        # Step 4: Validate directly against official Vietnamese syntax patterns (No character replacement)
         is_valid = bool(
-            VietnamPlateValidator.AUTO_PATTERN.match(corrected_text) or 
-            VietnamPlateValidator.MOTO_PATTERN.match(corrected_text)
+            VietnamPlateValidator.AUTO_PATTERN.match(cleaned) or 
+            VietnamPlateValidator.MOTO_PATTERN.match(cleaned)
         )
         
-        format_sim = VietnamPlateValidator.check_format_similarity(corrected_text)
+        format_sim = VietnamPlateValidator.check_format_similarity(cleaned)
                         
         return {
-            'text': corrected_text,
+            'text': cleaned,
             'raw_text': raw_text,
             'is_valid': is_valid,
             'format_similarity': format_sim['similarity'],
