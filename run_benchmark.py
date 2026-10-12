@@ -86,6 +86,33 @@ for r in results_list:
     valid_str = "YES" if r['valid'] else "NO"
     print(f"{r['image']:<18} | {r['try_level']:<10} | {r['resolution']:<10} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
 
+# Compute aggregate evaluation metrics
+total_imgs = len(results_list)
+detected_count = sum(1 for r in results_list if r['boxes'] > 0)
+valid_count = sum(1 for r in results_list if r['valid'])
+first_try_count = sum(1 for r in results_list if '1st' in r['try_level'])
+second_try_count = sum(1 for r in results_list if '2nd' in r['try_level'])
+
+# Calculate steady-state latency (excluding cold-start first image if batch > 1)
+steady_det_list = [r['det_ms'] for r in results_list[1:]] if total_imgs > 1 else [r['det_ms'] for r in results_list]
+steady_ocr_list = [r['ocr_ms'] for r in results_list[1:]] if total_imgs > 1 else [r['ocr_ms'] for r in results_list]
+avg_steady_det = sum(steady_det_list) / len(steady_det_list) if steady_det_list else 0.0
+avg_steady_ocr = sum(steady_ocr_list) / len(steady_ocr_list) if steady_ocr_list else 0.0
+
+print("\nAggregate Evaluation Metrics:")
+print(f"  Total Images Processed      : {total_imgs}")
+print(f"  Plate Detection Recall      : {(detected_count / total_imgs) * 100:.1f}% ({detected_count}/{total_imgs})")
+print(f"  Syntax Validation Pass Rate : {(valid_count / total_imgs) * 100:.1f}% ({valid_count}/{total_imgs})")
+print(f"  1st-Try Resolution Rate     : {(first_try_count / total_imgs) * 100:.1f}% ({first_try_count}/{total_imgs})")
+print(f"  2nd-Try Escalation Rate     : {(second_try_count / total_imgs) * 100:.1f}% ({second_try_count}/{total_imgs})")
+if total_imgs > 1:
+    print(f"  Average Steady-State Det ms : {avg_steady_det:.1f} ms (cold start excluded)")
+    print(f"  Average Steady-State OCR ms : {avg_steady_ocr:.1f} ms")
+else:
+    print(f"  Detection Latency           : {avg_steady_det:.1f} ms")
+    print(f"  OCR Latency                 : {avg_steady_ocr:.1f} ms")
+
+
 # Dynamically record latest run into BENCHMARK_SUMMARY.md
 summary_md_path = "BENCHMARK_SUMMARY.md"
 if os.path.exists(summary_md_path):

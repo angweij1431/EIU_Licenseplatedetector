@@ -310,19 +310,22 @@ In a separate terminal, trigger a simulated gate tap with an image from the test
 python simulate_rfid.py test_images/car_test_3.jpg
 ```
 
-### 3. (new terminal) Evaluate Single Images or Whole Directories
-Run the benchmark script on an individual image:
+### 3. Run Standalone Model Inference
+To test the model on a single image and generate a structured inference report with bounding boxes, confidence, OCR text, and latency profiling:
 ```bash
-python run_benchmark.py test_images/car_test_3.jpg
+python infer.py test_images/car_test_2.jpg
 ```
+*Outputs prediction logs to the console and saves annotated bounding box visualization to `Outputs/output_car_test_2.jpg`.*
 
-Or run the benchmark on all images in a directory at once:
+### 4. Evaluate Single Images or Whole Directories (Benchmarking)
+Run the batch benchmarking script across a directory of images:
 ```bash
 python run_benchmark.py test_images
 ```
-*Every run automatically records the tested filename, extracted plate, confidence, and format validity to [`BENCHMARK_SUMMARY.md`].*
+*Displays a comparative table, prints aggregate evaluation metrics (detection recall %, format pass rate %, average steady-state latency), and logs history to [`BENCHMARK_SUMMARY.md`].*
 
-### 4. Run Preprocessing Comparison (Raw vs. Enhanced)
+
+### 5. Run Preprocessing Comparison (Raw vs. Enhanced)
 To inspect what CLAHE and bilateral filtering do to an image:
 ```bash
 python compare_preprocessing.py test_images/car_test_3.jpg
