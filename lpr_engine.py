@@ -205,8 +205,8 @@ class LPRPipeline:
         joined = "-".join(val_lines)
         return VietnamPlateValidator.clean_and_correct(joined).get('is_valid', False)
 
-    # Crops plate bounding boxes and applies adaptive OCR recognition
-    def _crop_and_ocr(self, img, detections, crop_identifier, padding_percent):
+    # Crops plate bounding boxes and runs OCR (natural or enhanced)
+    def _crop_and_ocr(self, img, detections, crop_identifier, padding_percent, apply_enhancement=False):
         ocr_results = []
         if not detections or img is None:
             return ocr_results
@@ -224,31 +224,17 @@ class LPRPipeline:
             
             crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
             if crop.size > 0:
-                # Pass 1: Natural crop recognition (preserves clean letter curves without sharpening distortion)
-                raw_text_results = self.ocr.recognize(crop)
                 final_crop = crop
-                
-                # Check if natural crop produced a valid plate
-                natural_valid = False
-                if raw_text_results:
-                    val_lines = [r['text'] for r in raw_text_results if r.get('text')]
-                    joined_check = "-".join(val_lines) if len(val_lines) > 1 else val_lines[0]
-                    natural_valid = VietnamPlateValidator.clean_and_correct(joined_check).get('is_valid', False)
-                
-                if natural_valid:
-                    print("  [Crop around Bbox] (valid syntax confirmed; no enhancement filters)")
-                elif self.enable_preprocessing:
-                    print("  [Crop around Bbox] -> Applying image enhancement fallback (CLAHE + upscale)...")
+                if not apply_enhancement:
+                    # 1st try: 100% natural crop (zero filters to preserve clean character curves)
+                    print("  [1st try - Fast Pass] Natural crop evaluated with zero enhancement filters")
+                    raw_text_results = self.ocr.recognize(crop)
+                else:
+                    # 2nd try: Image enhancement fallback (CLAHE, bilateral filter, dynamic upscale)
+                    print("  [2nd try - Enhancement Pass] Applying adaptive image enhancement (CLAHE + upscale)...")
                     enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
-                    enhanced_text_results = self.ocr.recognize(enhanced_crop)
-                    if enhanced_text_results:
-                        val_lines_enh = [r['text'] for r in enhanced_text_results if r.get('text')]
-                        joined_enh = "-".join(val_lines_enh) if len(val_lines_enh) > 1 else val_lines_enh[0]
-                        enh_valid = VietnamPlateValidator.clean_and_correct(joined_enh).get('is_valid', False)
-                        if enh_valid or len(enhanced_text_results) > len(raw_text_results):
-                            raw_text_results = enhanced_text_results
-                            final_crop = enhanced_crop
-                            print("  [Crop around Bbox] Image enhancement succeeded in recovering valid plate characters")
+                    raw_text_results = self.ocr.recognize(enhanced_crop)
+                    final_crop = enhanced_crop
                     
                 crop_filename = f"crop_{crop_identifier}_{idx+1}.jpg"
                 crop_path = os.path.join(OUTPUTS_DIR, crop_filename)
@@ -278,7 +264,7 @@ class LPRPipeline:
         if img is None:
             raise FileNotFoundError(f"Failed to read image at path: {image_path}")
 
-        # 1st try: Fastest pass at standard resolution (640px)
+        # 1st try: Fastest pass at standard resolution (640px) with 100% natural crop (zero enhancement)
         det_start = time.time()
         try_level = "1st try"
         resolution = "640px"
@@ -287,37 +273,49 @@ class LPRPipeline:
         det_latency_ms = (time.time() - det_start) * 1000
         
         ocr_start = time.time()
-        ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent)
+        ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=False)
         ocr_latency_ms = (time.time() - ocr_start) * 1000
         
-        # Check if 1st try succeeded: confident detection + strictly valid Vietnamese syntax
+        # Check if 1st try succeeded: confident detection + strictly valid syntax from natural crop
         first_try_ok = (
             bool(detections) and 
             detections[0]['confidence'] >= 0.25 and 
             self._is_strictly_valid(ocr_results)
         )
         
-        # 2nd try: Slower verification pass at higher resolution (1024px zoom)
-        # Triggered if 1st try had: 0 detections (e.g. distant plate), low confidence, or unverified syntax
+        # 2nd try: Escalation pass with image enhancement (CLAHE/upscale) and/or 1024px zoom
+        # Triggered if 1st try had: 0 detections, low confidence, or unverified natural crop
         if not first_try_ok:
-            print("Notice: 1st try unverified. Escalating to 2nd try (1024px zoom)...")
+            print("Notice: 1st try unverified. Escalating to 2nd try (Enhancement & Zoom)...")
             try_level = "2nd try"
-            resolution = "1024px"
-            det_start_2 = time.time()
-            zoom_detections = self.detector.detect(image_path, imgsz=1024)
-            zoom_detections = self._select_primary(zoom_detections, sort_by, primary_only)
-            det_latency_ms += (time.time() - det_start_2) * 1000
             
-            if zoom_detections:
-                detections = zoom_detections
-                ocr_start_2 = time.time()
-                ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent)
-                ocr_latency_ms += (time.time() - ocr_start_2) * 1000
-                print(f"2nd try succeeded: Found plate at 1024px zoom | Conf: {detections[0]['confidence']:.2f}")
-            else:
-                print("Notice: 2nd try (1024px zoom) found 0 detections.")
-                if not detections:
-                    resolution = "none"
+            # Sub-step 2A: If plate was detected at 640px but text was faint, apply crop enhancement
+            if detections and detections[0]['confidence'] >= 0.25 and self.enable_preprocessing:
+                ocr_start_enh = time.time()
+                enh_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True)
+                ocr_latency_ms += (time.time() - ocr_start_enh) * 1000
+                if self._is_strictly_valid(enh_results) or len(enh_results) > len(ocr_results):
+                    ocr_results = enh_results
+                    print(f"2nd try succeeded: Image enhancement recovered valid plate | Conf: {detections[0]['confidence']:.2f}")
+            
+            # Sub-step 2B: If still unverified or 0 detections, escalate to 1024px zoom
+            if not self._is_strictly_valid(ocr_results):
+                resolution = "1024px"
+                det_start_2 = time.time()
+                zoom_detections = self.detector.detect(image_path, imgsz=1024)
+                zoom_detections = self._select_primary(zoom_detections, sort_by, primary_only)
+                det_latency_ms += (time.time() - det_start_2) * 1000
+                
+                if zoom_detections:
+                    detections = zoom_detections
+                    ocr_start_2 = time.time()
+                    ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=self.enable_preprocessing)
+                    ocr_latency_ms += (time.time() - ocr_start_2) * 1000
+                    print(f"2nd try succeeded: Found plate at 1024px zoom | Conf: {detections[0]['confidence']:.2f}")
+                else:
+                    print("Notice: 2nd try (1024px zoom) found 0 detections.")
+                    if not detections:
+                        resolution = "none"
 
         # Generate annotated visualization
         annotated_img = img.copy()

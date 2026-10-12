@@ -24,12 +24,12 @@ Added a simulation to showcase when a vehicle pulls up to the gate and a student
 flowchart TD
     A["Vehicle Arrives at Gate"] --> B["RFID Card Tap Trigger"]
     B --> C["FastAPI Server - main.py<br/>Receives Transaction Event"]
-    C --> D["1st try: Fastest Pass 640px<br/>YOLO11 Plate Detector"]
+    C --> D["1st try: Fast Pass 640px<br/>Natural Crop (Zero Filters)"]
     
     D -->|"Plate Found and Valid"| G["Accept 1st try<br/>Fast Sub-200ms"]
-    D -->|"Unverified or Missing Plate"| E["2nd try: Zoom Pass 1024px<br/>High-Resolution Escalation"]
+    D -->|"Faint, Missing Line, or 0 Boxes"| E["2nd try: Enhancement and Zoom<br/>CLAHE and Upscale / 1024px"]
     
-    E -->|"Plate Found and Valid"| H["Accept 2nd try<br/>Zoom Verified"]
+    E -->|"Plate Found and Valid Syntax"| H["Accept 2nd try<br/>Enhanced or Zoom Verified"]
     E -->|"Minor OCR Noise"| I["3rd try: Format Similarity<br/>Vietnamese Template DDLDDDDD"]
     E -->|"No Plate Found"| J["Unreadable Plate"]
     
