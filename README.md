@@ -23,53 +23,53 @@ Added a simulation to showcase when a vehicle pulls up to the gate and a student
 ```mermaid
 flowchart TD
     A["Vehicle Arrives at Gate"] --> B["RFID Card Tap Trigger"]
-    B --> C["FastAPI Server (main.py)<br/>Receives Transaction Event"]
-    C --> D["1st try: Fastest Pass (640px)<br/>YOLO11 Plate Detector"]
+    B --> C["FastAPI Server - main.py<br/>Receives Transaction Event"]
+    C --> D["1st try: Fastest Pass 640px<br/>YOLO11 Plate Detector"]
     
-    D -->|Plate Found & Valid Syntax| G["Accept 1st try (Fast Sub-200ms)"]
-    D -->|No Plate / Low Conf / Unverified| E["2nd try: Zoom Pass (1024px)<br/>High-Resolution Escalation"]
+    D -->|"Plate Found and Valid"| G["Accept 1st try<br/>Fast Sub-200ms"]
+    D -->|"Unverified or Missing Plate"| E["2nd try: Zoom Pass 1024px<br/>High-Resolution Escalation"]
     
-    E -->|Plate Found & Valid Syntax| H["Accept 2nd try (Zoom Verified)"]
-    E -->|Plate Found but Minor OCR Noise| I["3rd try: Format Similarity<br/>Checks Vietnamese Template (DDLDDDDD)"]
-    E -->|No Plate Found| J["Unreadable Plate"]
+    E -->|"Plate Found and Valid"| H["Accept 2nd try<br/>Zoom Verified"]
+    E -->|"Minor OCR Noise"| I["3rd try: Format Similarity<br/>Vietnamese Template DDLDDDDD"]
+    E -->|"No Plate Found"| J["Unreadable Plate"]
     
     G --> K{"Gate Decision Engine"}
     H --> K
     I --> K
     J --> K
     
-    K -->|Valid Student Card + Verified Plate (1st/2nd/3rd try)| L["GATE_OPEN<br/>Barrier Opens Normally"]
-    K -->|Valid Student Card + Unreadable Plate| M["GATE_OPEN_FLAGGED (CARD_ONLY)<br/>Barrier Opens, Transaction Logged for Guard Audit"]
-    K -->|Unauthorized RFID Card| N["ACCESS_DENIED (DENIED)<br/>Barrier Stays Closed, Security Alert Logged"]
+    K -->|"Valid Student Card and Verified Plate"| L["GATE_OPEN<br/>Barrier Opens Normally"]
+    K -->|"Valid Student Card and Unreadable Plate"| M["GATE_OPEN_FLAGGED CARD_ONLY<br/>Barrier Opens with Guard Audit"]
+    K -->|"Unauthorized RFID Card"| N["ACCESS_DENIED<br/>Barrier Stays Closed"]
 ```
 
 ### Component Dependency Structure
 
 ```mermaid
-graph LR
-    subgraph Input_Layer["Hardware Clients & Inputs"]
-        RFID["RFID Card Reader (simulate_rfid.py)"]
-        CAM["Snapshot Camera (test_images/)"]
+flowchart LR
+    subgraph Input_Layer["Hardware Clients and Inputs"]
+        RFID["RFID Card Reader - simulate_rfid.py"]
+        CAM["Snapshot Camera - test_images/"]
     end
 
     subgraph Service_Layer["Service Layer"]
-        MAIN["FastAPI Server (main.py)"]
+        MAIN["FastAPI Server - main.py"]
     end
 
-    subgraph Engine_Layer["Engine & Core Logic"]
-        ENG["LPR Pipeline (lpr_engine.py)"]
-        DET["YOLO Detector (lpr_engine.py)"]
-        OCR["PaddleOCR Adapter (lpr_engine.py)"]
-        PREP["Image Preprocessor (lpr_core/preprocessor.py)"]
-        VAL["Syntax Validator (lpr_core/validator.py)"]
+    subgraph Engine_Layer["Engine and Core Logic"]
+        ENG["LPR Pipeline - lpr_engine.py"]
+        DET["YOLO Detector - lpr_engine.py"]
+        OCR["PaddleOCR Adapter - lpr_engine.py"]
+        PREP["Image Preprocessor - lpr_core/preprocessor.py"]
+        VAL["Syntax Validator - lpr_core/validator.py"]
     end
 
     subgraph Model_Weights["Trained Weights"]
-        M1["Models_yolo/best.pt (Fine-tuned YOLO11 Plate Model)"]
+        M1["Models_yolo/best.pt<br/>Fine-tuned YOLO11 Plate Model"]
     end
 
-    RFID -->|HTTP POST Request| MAIN
-    CAM -->|Image Snapshot| MAIN
+    RFID -->|"HTTP POST Request"| MAIN
+    CAM -->|"Image Snapshot"| MAIN
     MAIN --> ENG
     ENG --> DET
     ENG --> OCR
