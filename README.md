@@ -1,17 +1,20 @@
 # Automated Vietnamese License Plate Recognition (LPR) & RFID Gate System
 
-An automated license plate recognition (ALPR / ANPR) and RFID card access backend for parking barrier gates. This system automatically locates vehicle license plates, cleans the plate image, transcribes the characters, checks them against official Vietnamese traffic rules, and decides whether to open the security barrier.
+An automated license plate detection model (YOLO x PaddleOCR), with RFID card access backend for parking gates. This system automatically locates vehicle license plates, cleans the plate image, transcribes the characters, checks them against official Vietnamese traffic rules, and decides whether to open the security barrier.
 
-Built with Ultralytics YOLOv8 for vehicle and plate detection, PaddleOCR for character recognition, OpenCV for image preprocessing, and FastAPI for the gate server.
+Made with: Ultralytics _YOLOv8_ for vehicle and plate detection, _PaddleOCR_ for character recognition, _OpenCV_ for image preprocessing, and _FastAPI_ for the gate server simulation made for testing latency between RFID to activate the model.
+
+
+This does not include the test for real-time camera.
 
 ---
 
 ## 1. System Overview and Data Flow
 
-Added a simulation to showcase: When a vehicle pulls up to the gate and a student or employee taps their card:
+Added a simulation to showcase when a vehicle pulls up to the gate and a student or employee taps their card:
 1. The RFID reader sends an event to the backend server with the card ID and a snapshot image.
 2. The system checks if a license plate exists in the image.
-3. If found, it zooms in, cleans up shadows and blur, and reads the characters.
+3. If found, a bounding box is created which is then manually and zooms in, , cleans up shadows and blur, and reads the characters.
 4. It checks whether the text matches official Vietnamese license plate syntax (format rules) that is manually written by me.
 5. If both the card and plate match security rules, the barrier gate opens. Otherwise, access is denied. 
 
@@ -82,7 +85,6 @@ Follow these instructions to set up a clean Python environment on any standard c
 
 ### Prerequisites
 * Python 3.10 or 3.11 installed.
-* Git installed.
 
 ### Step 1: Clone the Repository and Navigate to Folder
 ```bash
@@ -117,7 +119,7 @@ pip install -r requirements.txt
 ```
 
 > **Important Note for Windows Users**:  
-> In Python scripts where both PyTorch (`torch`) and PaddlePaddle (`paddle` / `paddleocr`) are used, always ensure `import torch` is called before importing PaddleOCR. This prevents a dynamic library conflict (`libiomp5md.dll`) between the two frameworks on Windows.
+> In Python scripts where both PyTorch (`torch`) and PaddlePaddle (`paddle` / `paddleocr`) are used, always ensure `import torch` is called **before** importing PaddleOCR to prevent a dynamic library conflict (`libiomp5md.dll`) between the two frameworks on Windows.
 
 ---
 
@@ -132,17 +134,17 @@ pip install -r requirements.txt
 * `simulate_rfid.py`: Testing client. Simulates a student tapping an RFID card at the gate.
 * `run_benchmark.py`: Batch and single-image testing script. Evaluates performance and dynamically logs results.
 * `compare_preprocessing.py`: Diagnostic comparison script. Runs raw vs. enhanced images side by side.
-* `BENCHMARK_SUMMARY.md`: Living evaluation record. Contains historical test runs and system configuration notes.
-* `Models_yolo/`: Folder containing model weight files (`best.pt` for plates, `yolov8n.pt` for vehicle fallback).
+* `BENCHMARK_SUMMARY.md`: Evaluation record. Contains historical test runs and system configuration notes (dynamically created from run_benchmark.py)
+* `Models_yolo/`: Folder containing model weight files (`best.pt` for plates, `yolov8n.pt` for base model vehicle fallback).
 * `test_images/`: Folder holding sample vehicle snapshot images for testing.
-* `ColabNotebookTemplate/`: Training scripts and notebooks for re-training YOLO on Google Colab.
+* `ColabNotebookTemplate/`: Model training notebooks for YOLO on Google Colab.
 * `archive/`: Storage folder for legacy scripts and earlier experimental files.
 
 ---
 
 ## 4. Deep Dive: Core Classes and Functional Modules
 
-### `YOLOv8Detector` in [`lpr_engine.py`](file:///c:/Users/User/EIU_OITP/lpr_research/lpr_engine.py)
+### `YOLOv8Detector` in [`lpr_engine.py`]
 * **What it does**: Scans the input photo and finds the coordinates (bounding box) of license plates.
 * **Key parameters and settings**:
   * `model_weights`: Path to the trained weight file (`Models_yolo/best.pt`).
@@ -153,7 +155,7 @@ pip install -r requirements.txt
 
 ---
 
-### `PaddleOCRAdapter` in [`lpr_engine.py`](file:///c:/Users/User/EIU_OITP/lpr_research/lpr_engine.py)
+### `PaddleOCRAdapter` in [`lpr_engine.py`]
 * **What it does**: Reads the alphanumeric characters from the cropped license plate image.
 * **Key parameters and settings**:
   * `use_doc_orientation_classify=False`: Disables whole-document rotation detection.
@@ -165,7 +167,7 @@ pip install -r requirements.txt
 
 ---
 
-### `PlatePreprocessor` in [`lpr_core/preprocessor.py`](file:///c:/Users/User/EIU_OITP/lpr_research/lpr_core/preprocessor.py)
+### `PlatePreprocessor` in [`lpr_core/preprocessor.py`]
 * **What it does**: Enhances the visual quality of the cropped plate image before sending it to OCR.
 * **Processing steps**:
   1. **Dynamic bicubic upscaling (resolution boost)**: If a crop is smaller than 160px wide, it is mathematically enlarged by 2.5x to thicken character strokes.
@@ -178,7 +180,7 @@ pip install -r requirements.txt
 
 ---
 
-### `VietnamPlateValidator` in [`lpr_core/validator.py`](file:///c:/Users/User/EIU_OITP/lpr_research/lpr_core/validator.py)
+### `VietnamPlateValidator` in [`lpr_core/validator.py`]
 * **What it does**: Cleans up noise symbols and verifies that the text follows official Vietnamese Ministry of Transport formatting rules.
 * **Key rules and cleanup logic**:
   * **Automobile pattern (`AUTO_PATTERN`)**: Matches `2 digits + 1 letter + dash + 3 to 5 digits` (e.g., `30E-697.70` or `29M-6840`).
@@ -189,7 +191,7 @@ pip install -r requirements.txt
 
 ---
 
-### `LPRPipeline` in [`lpr_engine.py`](file:///c:/Users/User/EIU_OITP/lpr_research/lpr_engine.py)
+### `LPRPipeline` in [`lpr_engine.py`]
 * **What it does**: Coordinates the entire sequence: calls the detector, crops the box with extra margins, runs preprocessing, executes OCR, and applies validation.
 * **Key parameters and settings**:
   * **Crop padding margin floor**:
@@ -197,9 +199,11 @@ pip install -r requirements.txt
     pad_w = max(20, int((x2 - x1) * padding_percent))
     pad_h = max(15, int((y2 - y1) * padding_percent))
     ```
-    On distant plates, a flat percentage (like 20%) only adds 6 to 8 pixels of margin, which cuts off letters sitting near the edge. Enforcing a minimum 20px margin guarantees all characters fit inside the crop.
-  * **Zero-detection hard guard**: If the detector finds no bounding boxes, the pipeline halts immediately rather than attempting full-image OCR.
-* **Expected behavioral impact**: Prevents character truncation on small plates and eliminates false-positive readings on background scenery.
+    On plates far from the camera, a flat percentage (like 20%) only adds 6 to 8 pixels of margin, which cuts off letters sitting near the edge. Enforcing a minimum 20px margin guarantees all characters fit inside the crop.
+  * **Dual-stage detection with base model fallback**:
+    The pipeline first runs the fine-tuned plate model (`best.pt`). If no plate is found (0 detections), it automatically triggers the base model (`yolov8n.pt`) to detect the vehicle body (`car`, `truck`, `bus`). This passes the vehicle region to PaddleOCR as a fallback safety net.
+  * **Zero-detection hard guard**: If neither the primary plate detector nor the base vehicle detector finds any targets, the pipeline halts immediately rather than attempting full-image OCR.
+* **Expected behavioral impact**: Prevents character truncation on small plates, provides a secondary detection pass via the base vehicle model if the tight plate box is missed, and eliminates false-positive readings on background scenery.
 
 ---
 

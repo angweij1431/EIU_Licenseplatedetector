@@ -91,12 +91,14 @@ In commercial automated gate installations, physical site engineering dictates r
 
 ## 7. Dynamic Evaluation History
 
-| Timestamp | Test Image | Boxes | Plate Text | Valid Format | Det (ms) | OCR (ms) |
-| :--- | :--- | :---: | :--- | :---: | :---: | :---: |
-| 2026-10-11 21:32:15 | `car_test_2.jpg` | 1 | `301-69770` | NO | 2744.2 | 1662.1 |
-| 2026-10-11 21:32:15 | `car_test_3.jpg` | 1 | `29M-8840` | YES | 260.8 | 3680.6 |
-| 2026-10-11 21:56:29 | `car_test_2.jpg` | 1 | `301-69770` | NO | 2897.4 | 1701.5 |
-| 2026-10-11 21:56:29 | `car_test_3.jpg` | 1 | `29M-8840` | YES | 266.6 | 3493.0 |
-| 2026-10-11 22:04:45 | `car_test_3.jpg` | 1 | `29M-8840` | YES | 2749.6 | 2080.3 |
-| 2026-10-11 22:05:49 | `car_test_2.jpg` | 1 | `301-69770` | NO | 2895.9 | 1589.6 |
-| 2026-10-11 22:05:49 | `car_test_3.jpg` | 1 | `29M-8840` | YES | 280.3 | 2665.2 |
+| Timestamp | Test Image | Detector Analysis | Boxes | Plate Text | Valid Format | Det (ms) | OCR (ms) |
+| :--- | :--- | :--- | :---: | :--- | :---: | :---: | :---: |
+| 2026-10-11 21:32:15 | `car_test_2.jpg` | Primary (Plate) | 1 | `301-69770` | NO | 2744.2 | 1662.1 |
+| 2026-10-11 21:32:15 | `car_test_3.jpg` | Primary (Plate) | 1 | `29M-8840` | YES | 260.8 | 3680.6 |
+| 2026-10-11 21:56:29 | `car_test_2.jpg` | Primary (Plate) | 1 | `301-69770` | NO | 2897.4 | 1701.5 |
+| 2026-10-11 21:56:29 | `car_test_3.jpg` | Primary (Plate) | 1 | `29M-8840` | YES | 266.6 | 3493.0 |
+| 2026-10-11 22:04:45 | `car_test_3.jpg` | Primary (Plate) | 1 | `29M-8840` | YES | 2749.6 | 2080.3 |
+| 2026-10-11 22:05:49 | `car_test_2.jpg` | Primary (Plate) | 1 | `301-69770` | NO | 2895.9 | 1589.6 |
+| 2026-10-11 22:05:49 | `car_test_3.jpg` | Primary (Plate) | 1 | `29M-8840` | YES | 280.3 | 2665.2 |
+| 2026-10-12 09:10:48 | `car_test_2.jpg` | Primary (Plate) | 1 | `301-69770` | NO | 4736.0 | 1695.3 |
+| 2026-10-12 09:10:48 | `car_test_3.jpg` | Primary (Plate) | 1 | `29M-8840` | YES | 335.8 | 2840.3 |
