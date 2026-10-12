@@ -2,7 +2,7 @@
 
 An automated license plate detection model (YOLO x PaddleOCR), with RFID card access backend for parking gates. This system automatically locates vehicle license plates, cleans the plate image, transcribes the characters, checks them against official Vietnamese traffic rules, and decides whether to open the security barrier.
 
-Made with: Ultralytics _YOLOv8_ for vehicle and plate detection, _PaddleOCR_ for character recognition, _OpenCV_ for image preprocessing, and _FastAPI_ for the gate server simulation made for testing latency between RFID to activate the model.
+Made with: Ultralytics _YOLO11_ for license plate detection, _PaddleOCR_ for character recognition, _OpenCV_ for image preprocessing, and _FastAPI_ for the gate server simulation made for testing latency between RFID to activate the model.
 
 
 This does not include the test for real-time camera.
@@ -14,30 +14,33 @@ This does not include the test for real-time camera.
 Added a simulation to showcase when a vehicle pulls up to the gate and a student or employee taps their card:
 1. The RFID reader sends an event to the backend server with the card ID and a snapshot image.
 2. The system checks if a license plate exists in the image.
-3. If found, a bounding box is created which is then manually and zooms in, , cleans up shadows and blur, and reads the characters.
-4. It checks whether the text matches official Vietnamese license plate syntax (format rules) that is manually written by me.
+3. If found, a bounding box is created which is then cropped, enhanced if needed for shadows and blur, and reads the characters.
+4. It checks whether the text matches official Vietnamese license plate syntax (format rules).
 5. If both the card and plate match security rules, the barrier gate opens. Otherwise, access is denied. 
 
 ### Pipeline Workflow Flowchart
 
 ```mermaid
 flowchart TD
-    A["Vehicle Arrives at Gate"] --> B["RFID Card Tap or Ground Sensor Trigger"]
+    A["Vehicle Arrives at Gate"] --> B["RFID Card Tap Trigger"]
     B --> C["FastAPI Server (main.py)<br/>Receives Transaction Event"]
-    C --> D["YOLOv8 Plate Detector (Models_yolo/best.pt)<br/>Locates Plate Bounding Box"]
+    C --> D["1st try: Fastest Pass (640px)<br/>YOLO11 Plate Detector"]
     
-    D -->|No Plate Found| E["Zero-Detection Guard<br/>Reject Transaction (HTTP 422)"]
-    D -->|Plate Detected| F["Crop Margin Floor<br/>Expand BBox by min 20px W, 15px H, to give space for OCR."]
+    D -->|Plate Found & Valid Syntax| G["Accept 1st try (Fast Sub-200ms)"]
+    D -->|No Plate / Low Conf / Unverified| E["2nd try: Zoom Pass (1024px)<br/>High-Resolution Escalation"]
     
-    F --> G["PlatePreprocessor (OpenCV)<br/>Contrast Enhancement & Denoising"]
-    G --> H["PaddleOCR Engine<br/>Transcribes Text Lines"]
+    E -->|Plate Found & Valid Syntax| H["Accept 2nd try (Zoom Verified)"]
+    E -->|Plate Found but Minor OCR Noise| I["3rd try: Format Similarity<br/>Checks Vietnamese Template (DDLDDDDD)"]
+    E -->|No Plate Found| J["Unreadable Plate"]
     
-    H --> I["Vertical Reading-Order Sorter<br/>Sorts Line 1 Top, Line 2 Bottom"]
-    I --> J["VietnamPlateValidator<br/>Cleans Rivets & Checks Syntax Pattern"]
+    G --> K{"Gate Decision Engine"}
+    H --> K
+    I --> K
+    J --> K
     
-    J --> K{"Security Verification<br/>Format Valid AND Confidence >= 0.50?"}
-    K -->|Pass| L["Access Granted<br/>Signal Gate Barrier to Open"]
-    K -->|Fail| M["Access Denied<br/>Keep Barrier Closed & Log Security Alert"]
+    K -->|Valid Student Card + Verified Plate (1st/2nd/3rd try)| L["GATE_OPEN<br/>Barrier Opens Normally"]
+    K -->|Valid Student Card + Unreadable Plate| M["GATE_OPEN_FLAGGED (CARD_ONLY)<br/>Barrier Opens, Transaction Logged for Guard Audit"]
+    K -->|Unauthorized RFID Card| N["ACCESS_DENIED (DENIED)<br/>Barrier Stays Closed, Security Alert Logged"]
 ```
 
 ### Component Dependency Structure
@@ -55,15 +58,14 @@ graph LR
 
     subgraph Engine_Layer["Engine & Core Logic"]
         ENG["LPR Pipeline (lpr_engine.py)"]
-        DET["YOLOv8 Detector (lpr_engine.py)"]
+        DET["YOLO Detector (lpr_engine.py)"]
         OCR["PaddleOCR Adapter (lpr_engine.py)"]
         PREP["Image Preprocessor (lpr_core/preprocessor.py)"]
         VAL["Syntax Validator (lpr_core/validator.py)"]
     end
 
     subgraph Model_Weights["Trained Weights"]
-        M1["Models_yolo/best.pt (Fine-tuned Plate Model)"]
-        M2["Models_yolo/yolov8n.pt (Base Vehicle Fallback)"]
+        M1["Models_yolo/best.pt (Fine-tuned YOLO11 Plate Model)"]
     end
 
     RFID -->|HTTP POST Request| MAIN
@@ -74,7 +76,6 @@ graph LR
     ENG --> PREP
     ENG --> VAL
     DET --> M1
-    DET --> M2
 ```
 
 ---
@@ -135,7 +136,7 @@ pip install -r requirements.txt
 * `run_benchmark.py`: Batch and single-image testing script. Evaluates performance and dynamically logs results.
 * `compare_preprocessing.py`: Diagnostic comparison script. Runs raw vs. enhanced images side by side.
 * `BENCHMARK_SUMMARY.md`: Evaluation record. Contains historical test runs and system configuration notes (dynamically created from run_benchmark.py)
-* `Models_yolo/`: Folder containing model weight files (`best.pt` for plates, `yolov8n.pt` for base model vehicle fallback).
+* `Models_yolo/`: Folder containing model weight files (`best.pt` for fine-tuned YOLO11 plate model).
 * `test_images/`: Folder holding sample vehicle snapshot images for testing.
 * `ColabNotebookTemplate/`: Model training notebooks for YOLO on Google Colab.
 * `archive/`: Storage folder for legacy scripts and earlier experimental files.
@@ -144,14 +145,14 @@ pip install -r requirements.txt
 
 ## 4. Deep Dive: Core Classes and Functional Modules
 
-### `YOLOv8Detector` in [`lpr_engine.py`]
-* **What it does**: Scans the input photo and finds the coordinates (bounding box) of license plates.
+### `YOLODetector` in [`lpr_engine.py`]
+* **What it does**: Scans the input photo and finds the coordinates (bounding box) of license plates using YOLO11.
 * **Key parameters and settings**:
   * `model_weights`: Path to the trained weight file (`Models_yolo/best.pt`).
   * `target_classes`: Restricts detection strictly to `['plate', 'license_plate']`. This prevents the model from accidentally drawing boxes on passersby, umbrellas, or background objects.
-  * `confidence_threshold`: Minimum probability floor (set to `0.10`).
-  * `imgsz=1024` (native high resolution): Tells YOLO to process the image at high resolution instead of downsampling (shrinking) to 640px. This keeps small, distant license plates legible.
-* **Expected behavioral impact**: Reliably isolates distant plates without false-positive boxes on non-vehicle objects.
+  * `confidence_threshold`: Minimum probability floor (set to `0.25`).
+  * `imgsz=640` (1st try) / `imgsz=1024` (2nd try zoom escalation): Processes at standard 640px for sub-200ms speed, escalating to 1024px if 1st try is unverified.
+* **Expected behavioral impact**: Reliably isolates distant plates without false-positive boxes on non-vehicle objects. Backward compatibility is retained via `YOLOv8Detector = YOLODetector`.
 
 ---
 
@@ -200,10 +201,13 @@ pip install -r requirements.txt
     pad_h = max(15, int((y2 - y1) * padding_percent))
     ```
     On plates far from the camera, a flat percentage (like 20%) only adds 6 to 8 pixels of margin, which cuts off letters sitting near the edge. Enforcing a minimum 20px margin guarantees all characters fit inside the crop.
-  * **Dual-stage detection with base model fallback**:
-    The pipeline first runs the fine-tuned plate model (`best.pt`). If no plate is found (0 detections), it automatically triggers the base model (`yolov8n.pt`) to detect the vehicle body (`car`, `truck`, `bus`). This passes the vehicle region to PaddleOCR as a fallback safety net.
-  * **Zero-detection hard guard**: If neither the primary plate detector nor the base vehicle detector finds any targets, the pipeline halts immediately rather than attempting full-image OCR.
-* **Expected behavioral impact**: Prevents character truncation on small plates, provides a secondary detection pass via the base vehicle model if the tight plate box is missed, and eliminates false-positive readings on background scenery.
+  * **Multi-try resolution escalation**:
+    The pipeline runs a multi-try architecture:
+    * 1st try: Fastest pass at standard resolution (640px) with natural crop.
+    * 2nd try: Escalation to 1024px zoom pass if 1st try had 0 detections or unverified syntax.
+    * 3rd try: Format similarity tolerance checking against structural Vietnamese plate templates (`DDLDDDD` / `DDLDDDDD`).
+  * **Zero-detection hard guard**: If the detector finds no plates after resolution escalation, the pipeline halts safely rather than attempting full-image OCR.
+* **Expected behavioral impact**: Prevents character truncation, achieves sub-200ms latency on clean plates, and eliminates false-positive readings on background clutter.
 
 ---
 
@@ -268,8 +272,8 @@ All training code is prepared in [`ColabNotebookTemplate/train_vietnam_lpr_colab
    project = rf.workspace("alphajack2006-gmail-com").project("vietnamese-car-license-plate-vlbzz")
    dataset = project.version(1).download("yolov8")
 
-   # Train YOLO model
-   model = YOLO("yolov8n.pt")
+   # Train YOLO model (use yolov8n.pt or upgrade to yolo11n.pt)
+   model = YOLO("yolov8n.pt")  # or YOLO("yolo11n.pt")
    model.train(
        data=f"{dataset.location}/data.yaml",
        epochs=50,       # 50 complete passes over the dataset
@@ -279,7 +283,7 @@ All training code is prepared in [`ColabNotebookTemplate/train_vietnam_lpr_colab
        name="vietnam_plate_lpr"
    )
    ```
-4. Download the resulting weights file (`runs/detect/vietnam_plate_lpr/weights/best.pt`) and place it into [`Models_yolo/best.pt`](file:///c:/Users/User/EIU_OITP/lpr_research/Models_yolo/best.pt) on your local machine.
+4. Download the resulting weights file (`runs/detect/vietnam_plate_lpr/weights/best.pt`) and place it into [`Models_yolo/best.pt`](file:///c:/Users/User/EIU_OITP/lpr_research/Models_yolo/best.pt) on your local machine. If fine-tuning YOLO11, name the export `yolo11n_plate.pt` or `best.pt`.
 
 ---
 

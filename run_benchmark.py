@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Import modular pipeline adapters from lpr_engine
 from lpr_engine import (
-    YOLOv8Detector, 
+    YOLODetector, 
     PaddleOCRAdapter, 
     LPRPipeline
 )
@@ -22,9 +22,9 @@ target_path = args.input_path
 if not os.path.exists(target_path):
     raise FileNotFoundError(f"Target path not found: {target_path}")
 
-# Initialize detector and OCR adapters
+# Initialize primary plate detector (fine-tuned YOLO11 model)
 model_path = "Models_yolo/best.pt" if os.path.exists("Models_yolo/best.pt") else "Models_yolo/yolov8n.pt"
-detector = YOLOv8Detector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.10)
+detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
 ocr = PaddleOCRAdapter(lang='en')
 pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
 
@@ -69,6 +69,8 @@ for idx, img_path in enumerate(image_files):
         
     results_list.append({
         'image': os.path.basename(img_path),
+        'try_level': summary.get('try_level', '1st try'),
+        'resolution': summary.get('resolution', '640px'),
         'boxes': len(summary['detections']),
         'plate': extracted_text,
         'valid': is_valid,
@@ -79,10 +81,10 @@ for idx, img_path in enumerate(image_files):
 
 # Print aggregate summary report
 print("\nBenchmark Summary Report:")
-print(f"{'Image':<20} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
+print(f"{'Image':<18} | {'Try Level':<10} | {'Resolution':<10} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
 for r in results_list:
     valid_str = "YES" if r['valid'] else "NO"
-    print(f"{r['image']:<20} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
+    print(f"{r['image']:<18} | {r['try_level']:<10} | {r['resolution']:<10} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
 
 # Dynamically record latest run into BENCHMARK_SUMMARY.md
 summary_md_path = "BENCHMARK_SUMMARY.md"
@@ -91,14 +93,14 @@ if os.path.exists(summary_md_path):
     with open(summary_md_path, "r", encoding="utf-8") as f:
         content = f.read()
         
-    history_header = "\n## 7. Dynamic Evaluation History\n\n| Timestamp | Test Image | Boxes | Plate Text | Valid Format | Det (ms) | OCR (ms) |\n| :--- | :--- | :---: | :--- | :---: | :---: | :---: |\n"
+    history_header = "\n## 7. Dynamic Evaluation History\n\n| Timestamp | Test Image | Try Level | Resolution | Boxes | Plate Text | Valid Format | Det (ms) | OCR (ms) |\n| :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: | :---: |\n"
     if "## 7. Dynamic Evaluation History" not in content:
         content += history_header
         
     rows_to_add = ""
     for r in results_list:
         valid_icon = "YES" if r['valid'] else "NO"
-        rows_to_add += f"| {timestamp_str} | `{r['image']}` | {r['boxes']} | `{r['plate']}` | {valid_icon} | {r['det_ms']:.1f} | {r['ocr_ms']:.1f} |\n"
+        rows_to_add += f"| {timestamp_str} | `{r['image']}` | {r['try_level']} | {r['resolution']} | {r['boxes']} | `{r['plate']}` | {valid_icon} | {r['det_ms']:.1f} | {r['ocr_ms']:.1f} |\n"
         
     content += rows_to_add
     with open(summary_md_path, "w", encoding="utf-8") as f:

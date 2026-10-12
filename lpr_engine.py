@@ -44,12 +44,12 @@ class BaseOCR(ABC):
         pass
 
 
-# Ultralytics YOLO detector adapter
-class YOLOv8Detector(BaseDetector):
+# Ultralytics YOLO detector adapter (supports YOLOv8, YOLO11, and custom fine-tuned weights)
+class YOLODetector(BaseDetector):
     # Initializes detector with model weights, target class filter, and confidence threshold
-    def __init__(self, model_weights: str = "Models_yolo/yolov8n.pt", 
+    def __init__(self, model_weights: str = "Models_yolo/best.pt", 
                  target_classes: list = VEHICLE_CLASSES, 
-                 confidence_threshold: float = 0.03):
+                 confidence_threshold: float = 0.25):
         from ultralytics import YOLO
         self.model_name = model_weights
         self.target_classes = target_classes
@@ -58,11 +58,11 @@ class YOLOv8Detector(BaseDetector):
         self.model = YOLO(model_weights)
         
     # Detects objects in image path and returns bounding boxes
-    def detect(self, image_path: str):
+    def detect(self, image_path: str, imgsz: int = 640):
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Detection image path not found: {image_path}")
             
-        results = self.model(image_path, conf=self.confidence_threshold, imgsz=1024, verbose=False) # fix: to increase image resolution for better detection accuracy
+        results = self.model(image_path, conf=self.confidence_threshold, imgsz=imgsz, verbose=False)
         detections = []
         for r in results:
             boxes = r.boxes
@@ -82,6 +82,10 @@ class YOLOv8Detector(BaseDetector):
                     'box': xyxy
                 })
         return detections
+
+
+# Backward-compatible alias
+YOLOv8Detector = YOLODetector
 
 
 # PaddleOCR model adapter
@@ -176,6 +180,89 @@ class LPRPipeline:
         self.enable_preprocessing = enable_preprocessing
         self.fallback_detector = fallback_detector
         
+    # Selects target vehicle / plate based on sorting criteria
+    def _select_primary(self, detections, sort_by='front', primary_only=True):
+        if not detections:
+            return []
+        if sort_by == 'front':
+            detections = sorted(detections, key=lambda d: d['box'][3], reverse=True)
+        elif sort_by == 'area':
+            detections = sorted(detections, key=lambda d: (d['box'][2]-d['box'][0])*(d['box'][3]-d['box'][1]), reverse=True)
+        elif sort_by == 'confidence':
+            detections = sorted(detections, key=lambda d: d['confidence'], reverse=True)
+        if primary_only and detections:
+            return [detections[0]]
+        return detections
+
+    # Checks whether extracted OCR results strictly match Vietnamese plate syntax
+    @staticmethod
+    def _is_strictly_valid(ocr_results):
+        if not ocr_results:
+            return False
+        if len(ocr_results) == 1:
+            return ocr_results[0].get('is_valid', False)
+        val_lines = [r['validated_text'] for r in ocr_results if r.get('validated_text')]
+        joined = "-".join(val_lines)
+        return VietnamPlateValidator.clean_and_correct(joined).get('is_valid', False)
+
+    # Crops plate bounding boxes and applies adaptive OCR recognition
+    def _crop_and_ocr(self, img, detections, crop_identifier, padding_percent):
+        ocr_results = []
+        if not detections or img is None:
+            return ocr_results
+            
+        for idx, d in enumerate(detections):
+            x1, y1, x2, y2 = map(int, d['box'])
+            h, w, _ = img.shape
+            pad_w = max(20, int((x2 - x1) * padding_percent))
+            pad_h = max(15, int((y2 - y1) * padding_percent))
+            
+            crop_x1 = max(0, x1 - pad_w)
+            crop_y1 = max(0, y1 - pad_h)
+            crop_x2 = min(w, x2 + pad_w)
+            crop_y2 = min(h, y2 + pad_h)
+            
+            crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
+            if crop.size > 0:
+                # Pass 1: Natural crop recognition (preserves clean letter curves without sharpening distortion)
+                raw_text_results = self.ocr.recognize(crop)
+                final_crop = crop
+                
+                # Check if natural crop produced a valid plate
+                natural_valid = False
+                if raw_text_results:
+                    val_lines = [r['text'] for r in raw_text_results if r.get('text')]
+                    joined_check = "-".join(val_lines) if len(val_lines) > 1 else val_lines[0]
+                    natural_valid = VietnamPlateValidator.clean_and_correct(joined_check).get('is_valid', False)
+                
+                if natural_valid:
+                    print("  [Crop around Bbox] (valid syntax confirmed; no enhancement filters)")
+                elif self.enable_preprocessing:
+                    print("  [Crop around Bbox] -> Applying image enhancement fallback (CLAHE + upscale)...")
+                    enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
+                    enhanced_text_results = self.ocr.recognize(enhanced_crop)
+                    if enhanced_text_results:
+                        val_lines_enh = [r['text'] for r in enhanced_text_results if r.get('text')]
+                        joined_enh = "-".join(val_lines_enh) if len(val_lines_enh) > 1 else val_lines_enh[0]
+                        enh_valid = VietnamPlateValidator.clean_and_correct(joined_enh).get('is_valid', False)
+                        if enh_valid or len(enhanced_text_results) > len(raw_text_results):
+                            raw_text_results = enhanced_text_results
+                            final_crop = enhanced_crop
+                            print("  [Crop around Bbox] Image enhancement succeeded in recovering valid plate characters")
+                    
+                crop_filename = f"crop_{crop_identifier}_{idx+1}.jpg"
+                crop_path = os.path.join(OUTPUTS_DIR, crop_filename)
+                cv2.imwrite(crop_path, final_crop)
+                
+                for res in raw_text_results:
+                    val_res = VietnamPlateValidator.clean_and_correct(res['text'])
+                    res['validated_text'] = val_res['text']
+                    res['is_valid'] = val_res['is_valid']
+                    res['format_similarity'] = val_res.get('format_similarity', 0.0)
+                    res['is_format_similar'] = val_res.get('is_format_similar', False)
+                    ocr_results.append(res)
+        return ocr_results
+
     # Executes detection, cropping, preprocessing, OCR, and validation
     def process(self, image_path: str, save_annotated_name: str = "output_annotated.jpg", 
                 sort_by: str = 'front', primary_only: bool = True, padding_percent: float = 0.20):
@@ -185,98 +272,63 @@ class LPRPipeline:
         
         print(f"Processing image: {image_path}")
         print(f"Detector: {self.detector.__class__.__name__} | OCR: {self.ocr.__class__.__name__}")
-        print(f"Preprocessing enhancement: {self.enable_preprocessing}")
+        print(f"Adaptive enhancement capability: {'Enabled' if self.enable_preprocessing else 'Disabled'}")
         
-        # Step 1: Object detection
-        det_start = time.time()
-        detections = self.detector.detect(image_path)
-        
-        # If primary detector detects nothing, log notice and attempt fallback detector if configured
-        if not detections:
-            print("Notice: Pretrained model did not detect any license plate.")
-            if self.fallback_detector is not None:
-                print("Running fallback to base vehicle detector...")
-                detections = self.fallback_detector.detect(image_path)
-                if detections:
-                    print(f"Fallback detector succeeded: Found {len(detections)} vehicle(s)")
-                else:
-                    print("Warning: Fallback detector also found 0 detections.")
-        
-        det_latency_ms = (time.time() - det_start) * 1000
-        print(f"Detection completed in {det_latency_ms:.2f} ms with {len(detections)} detection(s)")
-        
-        # Proximity sorting by lowest y2 coordinate (closest vehicle in front)
-        if detections:
-            if sort_by == 'front':
-                detections = sorted(detections, key=lambda d: d['box'][3], reverse=True)
-            elif sort_by == 'area':
-                detections = sorted(detections, key=lambda d: (d['box'][2]-d['box'][0])*(d['box'][3]-d['box'][1]), reverse=True)
-            elif sort_by == 'confidence':
-                detections = sorted(detections, key=lambda d: d['confidence'], reverse=True)
-
-        if primary_only and detections:
-            primary_vehicle = detections[0]
-            detections = [primary_vehicle]
-            print(f"Selected primary target: Class '{primary_vehicle['class']}' | Conf: {primary_vehicle['confidence']:.2f} | BBox: {primary_vehicle['box']}")
-
-        # Step 2: Read image for cropping and visualization
         img = cv2.imread(image_path)
         if img is None:
             raise FileNotFoundError(f"Failed to read image at path: {image_path}")
-            
-        annotated_img = img.copy()
-        ocr_results = []
-        ocr_start = time.time()
+
+        # 1st try: Fastest pass at standard resolution (640px)
+        det_start = time.time()
+        try_level = "1st try"
+        resolution = "640px"
+        detections = self.detector.detect(image_path, imgsz=640)
+        detections = self._select_primary(detections, sort_by, primary_only)
+        det_latency_ms = (time.time() - det_start) * 1000
         
+        ocr_start = time.time()
+        ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent)
+        ocr_latency_ms = (time.time() - ocr_start) * 1000
+        
+        # Check if 1st try succeeded: confident detection + strictly valid Vietnamese syntax
+        first_try_ok = (
+            bool(detections) and 
+            detections[0]['confidence'] >= 0.25 and 
+            self._is_strictly_valid(ocr_results)
+        )
+        
+        # 2nd try: Slower verification pass at higher resolution (1024px zoom)
+        # Triggered if 1st try had: 0 detections (e.g. distant plate), low confidence, or unverified syntax
+        if not first_try_ok:
+            print("Notice: 1st try unverified. Escalating to 2nd try (1024px zoom)...")
+            try_level = "2nd try"
+            resolution = "1024px"
+            det_start_2 = time.time()
+            zoom_detections = self.detector.detect(image_path, imgsz=1024)
+            zoom_detections = self._select_primary(zoom_detections, sort_by, primary_only)
+            det_latency_ms += (time.time() - det_start_2) * 1000
+            
+            if zoom_detections:
+                detections = zoom_detections
+                ocr_start_2 = time.time()
+                ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent)
+                ocr_latency_ms += (time.time() - ocr_start_2) * 1000
+                print(f"2nd try succeeded: Found plate at 1024px zoom | Conf: {detections[0]['confidence']:.2f}")
+            else:
+                print("Notice: 2nd try (1024px zoom) found 0 detections.")
+                if not detections:
+                    resolution = "none"
+
+        # Generate annotated visualization
+        annotated_img = img.copy()
         if detections:
             for idx, d in enumerate(detections):
                 x1, y1, x2, y2 = map(int, d['box'])
-                
-                # Expand crop bounding box with padding (minimum 20px horizontal, 15px vertical to avoid clipping edge characters)
-                h, w, _ = img.shape
-                pad_w = max(20, int((x2 - x1) * padding_percent))
-                pad_h = max(15, int((y2 - y1) * padding_percent))
-                
-                crop_x1 = max(0, x1 - pad_w)
-                crop_y1 = max(0, y1 - pad_h)
-                crop_x2 = min(w, x2 + pad_w)
-                crop_y2 = min(h, y2 + pad_h)
-                
-                # Draw detection rectangle on visualization copy
                 cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                label_text = f"#{idx+1} {d['class']} {d['confidence']:.2f}"
+                label_text = f"#{idx+1} {d['class']} {d['confidence']:.2f} ({try_level})"
                 cv2.putText(annotated_img, label_text, (x1, max(15, y1 - 5)), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
-                
-                # Crop bounding box region from original image
-                crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
-                if crop.size > 0:
-                    # Apply CLAHE and Bilateral filter if preprocessing is enabled
-                    if self.enable_preprocessing:
-                        crop = PlatePreprocessor.enhance_for_ocr(crop)
-                        
-                    # Save the preprocessed image for inspection
-                    preprocessed_filename = f"preprocessed_output_{crop_identifier}_{idx+1}.jpg"
-                    preprocessed_path = os.path.join(OUTPUTS_DIR, preprocessed_filename)
-                    cv2.imwrite(preprocessed_path, crop)
-                    print(f"Preprocessed crop saved: {preprocessed_path}")
-                        
-                    raw_text_results = self.ocr.recognize(crop)
-                    
-                    # Validate extracted text against Vietnamese license plate formats
-                    for res in raw_text_results:
-                        val_res = VietnamPlateValidator.clean_and_correct(res['text'])
-                        res['validated_text'] = val_res['text']
-                        res['is_valid'] = val_res['is_valid']
-                        ocr_results.append(res)
-        else:
-            print("No bounding boxes detected. Skipping OCR to prevent false positives.")
-            
-        ocr_latency_ms = (time.time() - ocr_start) * 1000
-        print(f"OCR completed in {ocr_latency_ms:.2f} ms with {len(ocr_results)} text result(s)")
-        for res in ocr_results:
-            print(f"Raw: '{res['text']}' -> Validated: '{res['validated_text']}' | Confidence: {res['confidence']:.4f}")
-            
+                            
         cv2.imwrite(output_file_path, annotated_img)
         print(f"Visualization saved to: {output_file_path}")
 
@@ -285,6 +337,8 @@ class LPRPipeline:
         
         return {
             'detector': self.detector.__class__.__name__,
+            'try_level': try_level,
+            'resolution': resolution,
             'ocr': self.ocr.__class__.__name__,
             'detections': detections,
             'ocr_results': ocr_results,
