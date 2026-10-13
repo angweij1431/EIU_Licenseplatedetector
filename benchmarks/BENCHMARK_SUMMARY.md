@@ -149,3 +149,6 @@ In commercial automated gate installations, physical site engineering dictates r
 | 2026-10-12 21:35:59 | `car_test_2.jpg` | 1st try | 640px | 1 | `30A-69770` | YES | 3289.6 | 1001.7 |
 | 2026-10-12 21:35:59 | `car_test_3.jpg` | 2nd try | 640px | 1 | `29H-6840` | YES | 115.9 | 3377.7 |
 | 2026-10-12 21:35:59 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G-743.72` | YES | 145.6 | 836.6 |
+| 2026-10-13 09:26:04 | `car_test_2.jpg` | 1st try | 640px | 1 | `30A-69770` | YES | 4436.8 | 841.8 |
+| 2026-10-13 09:26:04 | `car_test_3.jpg` | 2nd try | 640px | 1 | `29H-6840` | YES | 102.0 | 2794.8 |
+| 2026-10-13 09:26:04 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G-743.72` | YES | 133.0 | 718.9 |

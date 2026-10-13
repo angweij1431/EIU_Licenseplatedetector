@@ -5,6 +5,11 @@ import argparse
 import cv2
 import numpy as np
 
+# Allow importing lpr_engine and lpr_core from the project root directory
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 # Import core modules
 from lpr_engine import YOLODetector, PaddleOCRAdapter
 from lpr_core.preprocessor import PlatePreprocessor

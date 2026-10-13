@@ -5,6 +5,11 @@ import argparse
 import glob
 from datetime import datetime
 
+# Allow importing lpr_engine and lpr_core from the project root directory
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 # Import modular pipeline adapters from lpr_engine
 from lpr_engine import (
     YOLODetector, 
@@ -113,8 +118,8 @@ else:
     print(f"  OCR Latency                 : {avg_steady_ocr:.1f} ms")
 
 
-# Dynamically record latest run into BENCHMARK_SUMMARY.md
-summary_md_path = "BENCHMARK_SUMMARY.md"
+# record latest run into BENCHMARK_SUMMARY.md
+summary_md_path = os.path.join(os.path.dirname(__file__), "BENCHMARK_SUMMARY.md")
 if os.path.exists(summary_md_path):
     timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(summary_md_path, "r", encoding="utf-8") as f:
