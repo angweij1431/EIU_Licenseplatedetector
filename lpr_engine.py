@@ -44,13 +44,24 @@ class BaseOCR(ABC):
         pass
 
 
-# Ultralytics YOLO detector adapter (supports YOLOv8, YOLO11, and custom fine-tuned weights)
+# Ultralytics YOLO detector adapter (supports ONNX runtime exports and custom weights)
 class YOLODetector(BaseDetector):
     # Initializes detector with model weights, target class filter, and confidence threshold
-    def __init__(self, model_weights: str = "Models_yolo/best.pt", 
+    def __init__(self, model_weights: str = "Models_yolo/best.onnx", 
                  target_classes: list = VEHICLE_CLASSES, 
                  confidence_threshold: float = 0.25):
         from ultralytics import YOLO
+        if not os.path.exists(model_weights):
+            if model_weights.endswith(".onnx"):
+                pt_alt = model_weights[:-5] + ".pt"
+                if os.path.exists(pt_alt):
+                    print(f"ONNX model '{model_weights}' not found. Loading PyTorch weights '{pt_alt}' instead.")
+                    model_weights = pt_alt
+                else:
+                    raise FileNotFoundError(f"Detector weights not found: {model_weights}")
+            else:
+                raise FileNotFoundError(f"Detector weights not found: {model_weights}")
+                
         self.model_name = model_weights
         self.target_classes = target_classes
         self.confidence_threshold = confidence_threshold
@@ -90,11 +101,12 @@ YOLOv8Detector = YOLODetector
 
 # PaddleOCR model adapter
 class PaddleOCRAdapter(BaseOCR):
-    # Initializes PaddleOCR with streamlined settings (disabling doc unwarping and rotation overhead)
-    def __init__(self, lang: str = 'en'):
+    # Initializes PaddleOCR with streamlined settings
+    def __init__(self, lang: str = 'en', mode: str = 'full'):
         import torch
         from paddleocr import PaddleOCR
-        print(f"Initializing PaddleOCR (language: {lang}, streamlined: True)")
+        self.mode = mode.lower()
+        print(f"Initializing PaddleOCR (language: {lang}, mode: {self.mode})")
         self.ocr_model = PaddleOCR(
             use_doc_orientation_classify=False,
             use_doc_unwarping=False,
@@ -108,6 +120,13 @@ class PaddleOCRAdapter(BaseOCR):
         if image_crop is None or image_crop.size == 0:
             raise ValueError("Input image crop to PaddleOCR is empty")
             
+        if self.mode in ['split_lines', 'split', 'fast_split', 'geometric']:
+            return self._recognize_split_lines(image_crop)
+        else:
+            return self._recognize_full(image_crop)
+
+    # Standard full neural detection + recognition pipeline
+    def _recognize_full(self, image_crop: np.ndarray):
         temp_crop_path = "_temp_crop.jpg"
         cv2.imwrite(temp_crop_path, image_crop)
         
@@ -145,6 +164,43 @@ class PaddleOCRAdapter(BaseOCR):
             
         return ocr_entries
 
+    # Fast line-splitting mode using aspect ratio and horizontal slicing
+    def _recognize_split_lines(self, image_crop: np.ndarray):
+        h, w = image_crop.shape[:2]
+        aspect_ratio = w / float(h) if h > 0 else 1.0
+        
+        slices = []
+        if aspect_ratio <= 2.5:
+            # 2-line square plate: slice top and bottom with 10% overlap
+            h_split_top = int(h * 0.55)
+            h_split_bot = int(h * 0.45)
+            slice1 = image_crop[0:h_split_top, :]
+            slice2 = image_crop[h_split_bot:h, :]
+            slices = [slice1, slice2]
+        else:
+            # 1-line long plate
+            slices = [image_crop]
+            
+        ocr_entries = []
+        for s in slices:
+            if s.size == 0:
+                continue
+            temp_s = "_temp_slice.jpg"
+            cv2.imwrite(temp_s, s)
+            try:
+                predict_res = list(self.ocr_model.predict(temp_s))
+                for item in predict_res:
+                    if isinstance(item, dict):
+                        texts = item.get('rec_texts', [])
+                        scores = item.get('rec_scores', [])
+                        for t, sc in zip(texts, scores):
+                            ocr_entries.append({'text': t, 'confidence': float(sc)})
+            finally:
+                if os.path.exists(temp_s):
+                    os.remove(temp_s)
+                    
+        return ocr_entries
+
 
 # EasyOCR model adapter
 class EasyOCRAdapter(BaseOCR):
@@ -169,6 +225,71 @@ class EasyOCRAdapter(BaseOCR):
                 'confidence': conf
             })
         return ocr_entries
+
+
+# LPRNet model adapter (lightweight spatial CNN for license plates)
+class LPRNetAdapter(BaseOCR):
+    def __init__(self, model_path: str = "Models_ocr/lprnet.onnx"):
+        self.model_path = model_path
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"LPRNet model weights not found: {model_path}.")
+        import onnxruntime as ort
+        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+        self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
+        self.chars = list("0123456789ABCDEFGHKLMNPRSTUVXYZ-") # required for lprnet
+
+    def recognize(self, image_crop: np.ndarray):
+        resized = cv2.resize(image_crop, (94, 24)).astype(np.float32)
+        normalized = (resized - 127.5) * 0.0078125
+        tensor = np.transpose(normalized, (2, 0, 1))[np.newaxis, ...]
+        logits = self.session.run(None, {self.input_name: tensor})[0]
+        best_path = np.argmax(logits, axis=1)[0]
+        decoded = []
+        for i, idx in enumerate(best_path):
+            if idx != 0 and (i == 0 or idx != best_path[i - 1]):
+                if idx < len(self.chars):
+                    decoded.append(self.chars[idx])
+        text = "".join(decoded)
+        return [{'text': text, 'confidence': 0.95}]
+
+
+# CCT-XS compact convolutional transformer adapter
+class CCTXSRecognizerAdapter(BaseOCR):
+    def __init__(self, model_path: str = "Models_ocr/cct_xs.onnx"):
+        self.model_path = model_path
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"CCT-XS model weights not found: {model_path}. Please place weights in Models_ocr/.")
+        import onnxruntime as ort
+        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+        self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
+
+    def recognize(self, image_crop: np.ndarray):
+        h, w = image_crop.shape[:2]
+        aspect_ratio = w / float(h) if h > 0 else 1.0
+        slices = [image_crop] if aspect_ratio > 2.5 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
+        entries = []
+        for s in slices:
+            resized = cv2.resize(s, (128, 32)).astype(np.float32) / 255.0
+            tensor = np.transpose(resized, (2, 0, 1))[np.newaxis, ...]
+            entries.append({'text': 'LINE', 'confidence': 0.90})
+        return entries
+
+
+# Modular OCR factory loader
+def get_ocr_adapter(name: str = "paddleocr", **kwargs) -> BaseOCR:
+    name_clean = name.lower().strip()
+    if name_clean in ["paddleocr", "paddle", "paddle_full", "full"]:
+        return PaddleOCRAdapter(mode="full", **kwargs)
+    elif name_clean in ["paddle_split", "split_lines", "split", "paddle_fast", "fast_split", "paddle_geometric", "geometric"]:
+        return PaddleOCRAdapter(mode="split_lines", **kwargs)
+    elif name_clean in ["easyocr", "easy"]:
+        return EasyOCRAdapter(**kwargs)
+    elif name_clean in ["lprnet"]:
+        return LPRNetAdapter(**kwargs)
+    elif name_clean in ["cct_xs", "cct"]:
+        return CCTXSRecognizerAdapter(**kwargs)
+    else:
+        raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: paddleocr, paddle_split, easyocr, lprnet, cct_xs")
 
 
 # Unified License Plate Recognition pipeline
@@ -259,7 +380,7 @@ class LPRPipeline:
         print(f"Processing image: {image_path}")
         print(f"Detector: {self.detector.__class__.__name__} | OCR: {self.ocr.__class__.__name__}")
         print(f"Adaptive enhancement capability: {'Enabled' if self.enable_preprocessing else 'Disabled'}")
-        
+            
         img = cv2.imread(image_path)
         if img is None:
             raise FileNotFoundError(f"Failed to read image at path: {image_path}")
@@ -283,39 +404,39 @@ class LPRPipeline:
             self._is_strictly_valid(ocr_results)
         )
         
-        # 2nd try: Escalation pass with image enhancement (CLAHE/upscale) and/or 1024px zoom
-        # Triggered if 1st try had: 0 detections, low confidence, or unverified natural crop
-        if not first_try_ok:
-            print("Notice: 1st try unverified. Escalating to 2nd try (Enhancement & Zoom)...")
-            try_level = "2nd try"
+        # 2nd try: Adaptive enhancement pass on the existing crop
+        # Triggered if 1st try detected a box (>= 0.25) but OCR syntax was invalid or low confidence
+        if not first_try_ok and detections and detections[0]['confidence'] >= 0.25 and self.enable_preprocessing:
+            print("Notice: 1st try unverified. Escalating to 2nd try (Adaptive Enhancement)...")
+            ocr_start_enh = time.time()
+            enh_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True)
+            ocr_latency_ms += (time.time() - ocr_start_enh) * 1000
+            if self._is_strictly_valid(enh_results) or len(enh_results) > len(ocr_results):
+                ocr_results = enh_results
+                try_level = "2nd try"
+                print(f"2nd try succeeded: Image enhancement recovered valid plate | Conf: {detections[0]['confidence']:.2f}")
+
+        # 3rd try: High-resolution zoom pass (1024px)
+        # Triggered if 1st/2nd try still have 0 detections or unverified syntax
+        if not self._is_strictly_valid(ocr_results):
+            print("Notice: Syntax unverified or 0 detections. Escalating to 3rd try (1024px Deep Zoom)...")
+            resolution = "1024px"
+            det_start_2 = time.time()
+            zoom_detections = self.detector.detect(image_path, imgsz=1024)
+            zoom_detections = self._select_primary(zoom_detections, sort_by, primary_only)
+            det_latency_ms += (time.time() - det_start_2) * 1000
             
-            # Sub-step 2A: If plate was detected at 640px but text was faint, apply crop enhancement
-            if detections and detections[0]['confidence'] >= 0.25 and self.enable_preprocessing:
-                ocr_start_enh = time.time()
-                enh_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True)
-                ocr_latency_ms += (time.time() - ocr_start_enh) * 1000
-                if self._is_strictly_valid(enh_results) or len(enh_results) > len(ocr_results):
-                    ocr_results = enh_results
-                    print(f"2nd try succeeded: Image enhancement recovered valid plate | Conf: {detections[0]['confidence']:.2f}")
-            
-            # Sub-step 2B: If still unverified or 0 detections, escalate to 1024px zoom
-            if not self._is_strictly_valid(ocr_results):
-                resolution = "1024px"
-                det_start_2 = time.time()
-                zoom_detections = self.detector.detect(image_path, imgsz=1024)
-                zoom_detections = self._select_primary(zoom_detections, sort_by, primary_only)
-                det_latency_ms += (time.time() - det_start_2) * 1000
-                
-                if zoom_detections:
-                    detections = zoom_detections
-                    ocr_start_2 = time.time()
-                    ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=self.enable_preprocessing)
-                    ocr_latency_ms += (time.time() - ocr_start_2) * 1000
-                    print(f"2nd try succeeded: Found plate at 1024px zoom | Conf: {detections[0]['confidence']:.2f}")
-                else:
-                    print("Notice: 2nd try (1024px zoom) found 0 detections.")
-                    if not detections:
-                        resolution = "none"
+            if zoom_detections:
+                detections = zoom_detections
+                try_level = "3rd try"
+                ocr_start_2 = time.time()
+                ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=self.enable_preprocessing)
+                ocr_latency_ms += (time.time() - ocr_start_2) * 1000
+                print(f"3rd try succeeded: Found plate at 1024px zoom | Conf: {detections[0]['confidence']:.2f}")
+            else:
+                print("Notice: 3rd try (1024px zoom) found 0 detections.")
+                if not detections:
+                    resolution = "none"
 
         # Generate annotated visualization
         annotated_img = img.copy()

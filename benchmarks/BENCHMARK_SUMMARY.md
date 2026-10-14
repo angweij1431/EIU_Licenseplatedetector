@@ -152,3 +152,115 @@ In commercial automated gate installations, physical site engineering dictates r
 | 2026-10-13 09:26:04 | `car_test_2.jpg` | 1st try | 640px | 1 | `30A-69770` | YES | 4436.8 | 841.8 |
 | 2026-10-13 09:26:04 | `car_test_3.jpg` | 2nd try | 640px | 1 | `29H-6840` | YES | 102.0 | 2794.8 |
 | 2026-10-13 09:26:04 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G-743.72` | YES | 133.0 | 718.9 |
+| 2026-10-13 16:36:10 | `car_test_2.jpg` | 1st try | 640px | 1 | `30A-69770` | YES | 5860.5 | 1663.4 |
+| 2026-10-13 16:36:10 | `car_test_3.jpg` | 2nd try | 640px | 1 | `29H-6840` | YES | 206.0 | 4583.8 |
+| 2026-10-13 16:36:10 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G-743.72` | YES | 281.8 | 1220.9 |
+
+## 8. YOLO Detection ONNX Performance (Cold Start Excluded)
+
+*Evaluated at: `2026-10-13 16:46:11` across `3` test images*
+
+| Model Architecture | File | Format | Recall % | Plates Detected | Steady Latency (ms) |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **YOLO11-FineTuned (best)** | `best.onnx` | ONNX | 100.0% | 3/3 | **49.7 ms** |
+| **YOLOv8-FineTuned** | `best_yolo8.onnx` | ONNX | 66.7% | 2/3 | **75.9 ms** |
+| **YOLOv8-Nano (Base)** | `yolov8n.onnx` | ONNX | 100.0% | 3/3 | **158.0 ms** |
+
+| 2026-10-13 16:47:53 | `car_test_2.jpg` | 1st try | 640px | 1 | `30A-69770` | YES | 4621.2 | 1900.2 |
+| 2026-10-13 16:47:53 | `car_test_3.jpg` | 2nd try | 640px | 1 | `29H-6840` | YES | 201.9 | 5713.1 |
+| 2026-10-13 16:47:53 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G-743.72` | YES | 88.5 | 1628.0 |
+
+## 8. Complete YOLO ONNX Architecture Matrix (Cold Start Excluded)
+
+*Evaluated at: `2026-10-13 16:51:30` across `3` test images*
+
+| ONNX Model File | Model Size | Plate Recall % | Plates Detected | Steady Latency (ms) |
+| :--- | :---: | :---: | :---: | :---: |
+| `best.onnx` | 10.2 MB | 100.0% | 3/3 | **64.4 ms** |
+| `best_11s.onnx` | 36.2 MB | 100.0% | 3/3 | **91.2 ms** |
+| `best_yolo10n.onnx` | 9.0 MB | 66.7% | 2/3 | **54.0 ms** |
+| `best_yolo10s.onnx` | 27.8 MB | 100.0% | 3/3 | **92.1 ms** |
+| `best_yolo11n.onnx` | 10.2 MB | 66.7% | 2/3 | **50.2 ms** |
+| `best_yolo11s.onnx` | 36.2 MB | 100.0% | 3/3 | **197.7 ms** |
+| `best_yolo26n.onnx` | 9.4 MB | 66.7% | 2/3 | **107.2 ms** |
+| `best_yolo26s.onnx` | 36.4 MB | 100.0% | 3/3 | **193.5 ms** |
+| `best_yolo8.onnx` | 12.2 MB | 66.7% | 2/3 | **85.4 ms** |
+| `yolov8n.onnx` | 12.3 MB | 100.0% | 3/3 | **86.5 ms** |
+
+
+## 8. Complete Multi-Model End-to-End Pipeline Matrix
+
+*Evaluated at: `2026-10-13 16:57:44` across `3` test images (General latency including cold-start captured)*
+
+| ONNX Model | Size | Plate Recall | Syntax Valid | 1st-Try Rate | 2nd-Try Rate | Avg Det (ms) | Avg OCR (ms) | Avg Total (ms) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `best_yolo10n.onnx` | 9.0 MB | 66.7% | 66.7% | 66.7% | 33.3% | 1639.9 ms | 1290.1 ms | **2951.3 ms** |
+| `best_yolo10s.onnx` | 27.8 MB | 100.0% | 66.7% | 33.3% | 66.7% | 602.9 ms | 9373.6 ms | **10012.2 ms** |
+| `best_yolo11n.onnx` | 10.2 MB | 66.7% | 66.7% | 66.7% | 33.3% | 445.6 ms | 1574.1 ms | **2048.6 ms** |
+| `best_yolo11s.onnx` | 36.2 MB | 100.0% | 66.7% | 66.7% | 33.3% | 394.0 ms | 3810.6 ms | **4225.3 ms** |
+| `best_yolo26n.onnx` | 9.4 MB | 66.7% | 33.3% | 33.3% | 66.7% | 225.3 ms | 2918.5 ms | **3164.7 ms** |
+| `best_yolo26s.onnx` | 36.4 MB | 100.0% | 66.7% | 66.7% | 33.3% | 303.7 ms | 2545.8 ms | **2868.5 ms** |
+| `best_yolo8.onnx` | 12.2 MB | 66.7% | 66.7% | 66.7% | 33.3% | 98.2 ms | 669.7 ms | **781.3 ms** |
+| `yolov8n.onnx` | 12.3 MB | 0.0% | 0.0% | 0.0% | 100.0% | 180.9 ms | 0.0 ms | **197.6 ms** |
+
+
+## 9. Real Empirical Output & Confidence Matrix
+
+*Evaluated at: `2026-10-13 17:04:58` across `3` test images (Measured outputs and model confidence scores only)*
+
+### Model Summary
+
+| ONNX Model | Plate Recall | Avg Det Conf % | Gate Open Rate | Avg OCR Conf % | Try 1 | Try 2 | Gate Closed | Avg Det (ms) | Avg Total (ms) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `best_yolo10n.onnx` | 2/3 (66.7%) | 51.5% | **2/3 (66.7%)** | 63.2% | 2 | 0 | 1 | 946.7 ms | **2149.6 ms** |
+| `best_yolo10s.onnx` | 3/3 (100.0%) | 65.3% | **2/3 (66.7%)** | 92.8% | 1 | 1 | 1 | 404.4 ms | **5784.9 ms** |
+| `best_yolo11n.onnx` | 2/3 (66.7%) | 50.6% | **2/3 (66.7%)** | 64.5% | 2 | 0 | 1 | 170.0 ms | **1008.4 ms** |
+| `best_yolo11s.onnx` | 3/3 (100.0%) | 61.9% | **2/3 (66.7%)** | 98.0% | 2 | 0 | 1 | 215.6 ms | **2639.7 ms** |
+| `best_yolo26n.onnx` | 2/3 (66.7%) | 52.3% | **1/3 (33.3%)** | 63.5% | 1 | 0 | 2 | 125.1 ms | **2427.7 ms** |
+| `best_yolo26s.onnx` | 3/3 (100.0%) | 67.9% | **2/3 (66.7%)** | 94.0% | 2 | 0 | 1 | 339.9 ms | **2736.4 ms** |
+| `best_yolo8.onnx` | 2/3 (66.7%) | 53.2% | **2/3 (66.7%)** | 63.9% | 2 | 0 | 1 | 187.9 ms | **1030.7 ms** |
+| `yolov8n.onnx` | 0/3 (0.0%) | 0.0% | **0/3 (0.0%)** | 0.0% | 0 | 0 | 3 | 188.4 ms | **205.1 ms** |
+
+### Per-Image Real Outputs
+
+| Model | Image | Plate Detected (Conf %) | Valid Format (OCR Conf %) | Gate Status | Extracted Plate | Det (ms) | OCR (ms) | Total (ms) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `best_yolo10n.onnx` | `car_test_2.jpg` | YES (75.9%) | YES (94.6%) | **Try 1** | `30A-69770` | 2530.7 | 1500.0 | 4042.7 |
+| `best_yolo10n.onnx` | `car_test_3.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 234.3 | 0.0 | 275.3 |
+| `best_yolo10n.onnx` | `car_test_4.jpg` | YES (78.5%) | YES (94.9%) | **Try 1** | `51G-743.72` | 75.0 | 2037.3 | 2130.9 |
+| `best_yolo10s.onnx` | `car_test_2.jpg` | YES (76.1%) | YES (94.3%) | **Try 1** | `30A-69770` | 692.4 | 1686.6 | 2396.0 |
+| `best_yolo10s.onnx` | `car_test_3.jpg` | YES (44.9%) | YES (85.0%) | **Try 2** | `29H-6840` | 183.3 | 5284.1 | 5505.6 |
+| `best_yolo10s.onnx` | `car_test_4.jpg` | YES (74.9%) | NO (99.2%) | **Gate Closed** | `516-743.72` | 337.4 | 9103.7 | 9453.0 |
+| `best_yolo11n.onnx` | `car_test_2.jpg` | YES (76.5%) | YES (95.6%) | **Try 1** | `30A-69770` | 357.9 | 1393.4 | 1760.3 |
+| `best_yolo11n.onnx` | `car_test_3.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 107.2 | 0.0 | 135.2 |
+| `best_yolo11n.onnx` | `car_test_4.jpg` | YES (75.1%) | YES (97.9%) | **Try 1** | `51G-743.72` | 45.0 | 1077.8 | 1129.8 |
+| `best_yolo11s.onnx` | `car_test_2.jpg` | YES (74.0%) | YES (97.9%) | **Try 1** | `30A-69770` | 310.1 | 986.7 | 1304.7 |
+| `best_yolo11s.onnx` | `car_test_3.jpg` | YES (36.0%) | NO (100.0%) | **Gate Closed** | `TRUNGT` | 222.6 | 5357.9 | 5602.0 |
+| `best_yolo11s.onnx` | `car_test_4.jpg` | YES (75.6%) | YES (96.1%) | **Try 1** | `51G-743.72` | 114.2 | 891.1 | 1012.2 |
+| `best_yolo26n.onnx` | `car_test_2.jpg` | YES (76.6%) | YES (94.5%) | **Try 1** | `30A-69770` | 188.8 | 902.3 | 1098.1 |
+| `best_yolo26n.onnx` | `car_test_3.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 94.5 | 0.0 | 120.5 |
+| `best_yolo26n.onnx` | `car_test_4.jpg` | YES (80.4%) | NO (95.9%) | **Gate Closed** | `516-743.72` | 92.0 | 5962.8 | 6064.6 |
+| `best_yolo26s.onnx` | `car_test_2.jpg` | YES (76.6%) | YES (97.5%) | **Try 1** | `30A-69770` | 472.8 | 1636.0 | 2120.8 |
+| `best_yolo26s.onnx` | `car_test_3.jpg` | YES (51.6%) | NO (87.1%) | **Gate Closed** | `A` | 450.8 | 4300.8 | 4778.6 |
+| `best_yolo26s.onnx` | `car_test_4.jpg` | YES (75.6%) | YES (97.4%) | **Try 1** | `51G-743.72` | 96.2 | 1204.5 | 1309.7 |
+| `best_yolo8.onnx` | `car_test_2.jpg` | YES (79.6%) | YES (94.6%) | **Try 1** | `30A-69770` | 353.5 | 1416.3 | 1779.8 |
+| `best_yolo8.onnx` | `car_test_3.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 135.0 | 0.0 | 162.0 |
+| `best_yolo8.onnx` | `car_test_4.jpg` | YES (80.0%) | YES (97.2%) | **Try 1** | `51G-743.72` | 75.1 | 1066.2 | 1150.3 |
+| `yolov8n.onnx` | `car_test_2.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 287.9 | 0.0 | 298.9 |
+| `yolov8n.onnx` | `car_test_3.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 142.1 | 0.0 | 170.1 |
+| `yolov8n.onnx` | `car_test_4.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 135.2 | 0.0 | 146.2 |
+
+| 2026-10-14 09:19:52 | `car_test_2.jpg` | 1st try | 640px | 1 | `30A-69770` | YES | 6119.9 | 1585.2 |
+| 2026-10-14 09:19:52 | `car_test_3.jpg` | 2nd try | 640px | 1 | `29H-6840` | YES | 186.2 | 10585.9 |
+| 2026-10-14 09:19:52 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G-743.72` | YES | 543.9 | 2693.4 |
+| 2026-10-14 09:19:52 | `car_test_5.jpg` | 1st try | 640px | 1 | `51G-777.77` | YES | 326.1 | 2808.5 |
+| 2026-10-14 09:19:52 | `car_test_6.jpg` | 2nd try | 1024px | 1 | `63-H9-0394` | NO | 1020.9 | 17449.3 |
+| 2026-10-14 09:19:52 | `car_test_7.jpg` | 2nd try | none | 0 | `NONE` | NO | 635.1 | 0.0 |
+| 2026-10-14 09:19:52 | `car_test_8.jpg` | 2nd try | none | 0 | `NONE` | NO | 575.8 | 0.0 |
+| 2026-10-14 09:23:02 | `car_test_2.jpg` | 1st try | 640px | 1 | `30A-69770` | YES | 2669.3 | 812.0 |
+| 2026-10-14 09:23:02 | `car_test_3.jpg` | 2nd try | 1024px | 1 | `29M-6840` | YES | 323.4 | 2346.5 |
+| 2026-10-14 09:23:02 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G-743.72` | YES | 209.3 | 1428.6 |
+| 2026-10-14 09:23:02 | `car_test_5.jpg` | 1st try | 640px | 1 | `51G-777.77` | YES | 170.4 | 1215.8 |
+| 2026-10-14 09:23:02 | `car_test_6.jpg` | 2nd try | 1024px | 1 | `63-H9-0394` | NO | 497.5 | 9069.6 |
+| 2026-10-14 09:23:02 | `car_test_7.jpg` | 2nd try | none | 0 | `NONE` | NO | 328.6 | 0.0 |
+| 2026-10-14 09:23:02 | `car_test_8.jpg` | 2nd try | none | 0 | `NONE` | NO | 331.2 | 0.0 |

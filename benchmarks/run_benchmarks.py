@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 import argparse
 import glob
 from datetime import datetime
@@ -14,23 +13,33 @@ if PROJECT_ROOT not in sys.path:
 from lpr_engine import (
     YOLODetector, 
     PaddleOCRAdapter, 
-    LPRPipeline
+    LPRPipeline,
+    get_ocr_adapter
 )
 from lpr_core.validator import VietnamPlateValidator
 
 # Parse command line argument for vehicle test image or directory path
 parser = argparse.ArgumentParser(description="Run LPR Pipeline Benchmark on an Image or Directory of Images")
 parser.add_argument("input_path", nargs="?", default="test_images/car_test_3.jpg", help="Path to input image or directory (default: test_images/car_test_3.jpg)")
+parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to detector model (default: Models_yolo/best.onnx)")
+parser.add_argument("--ocr", default="paddleocr", help="OCR engine mode: paddleocr, paddle_geometric, easyocr (default: paddleocr)")
 args = parser.parse_args()
 
 target_path = args.input_path
 if not os.path.exists(target_path):
     raise FileNotFoundError(f"Target path not found: {target_path}")
 
-# Initialize primary plate detector (fine-tuned YOLO11 model)
-model_path = "Models_yolo/best.pt" if os.path.exists("Models_yolo/best.pt") else "Models_yolo/yolov8n.pt"
+# Initialize primary plate detector
+model_path = args.model
+if not os.path.exists(model_path):
+    if model_path == "Models_yolo/best.onnx" and os.path.exists("Models_yolo/best.pt"):
+        print(f"Notice: 'Models_yolo/best.onnx' not found. Using 'Models_yolo/best.pt'.")
+        model_path = "Models_yolo/best.pt"
+    else:
+        raise FileNotFoundError(f"Detector model not found: {model_path}. Please place exported weights in Models_yolo/.")
+
 detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
-ocr = PaddleOCRAdapter(lang='en')
+ocr = get_ocr_adapter(args.ocr)
 pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
 
 # Determine whether input is a single file or a directory

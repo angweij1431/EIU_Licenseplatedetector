@@ -12,20 +12,17 @@ from lpr_engine import (
 )
 from lpr_core.validator import VietnamPlateValidator
 
-def run_inference(image_path: str, model_path: str = "Models_yolo/best.pt", conf_thresh: float = 0.25):
+def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", conf_thresh: float = 0.25):
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Input image not found: {image_path}")
 
-    # Fallback to base weights if fine-tuned weights are absent
     if not os.path.exists(model_path):
-        fallback_model = "Models_yolo/yolov8n.pt"
-        if os.path.exists(fallback_model):
-            model_path = fallback_model
+        raise FileNotFoundError(f"ONNX model not found: {model_path}. Please place exported ONNX weights in Models_yolo/.")
 
     print("======================================================================")
     print(f"LPR MODEL INFERENCE: {os.path.basename(image_path)}")
     print("======================================================================")
-    print("[1] Loading AI Models (YOLO11 Plate Detector & PaddleOCR)")
+    print(f"[1] Loading AI Models (YOLO ONNX Plate Detector & PaddleOCR)")
     detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=conf_thresh)
     ocr = PaddleOCRAdapter(lang='en')
     pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
@@ -94,7 +91,7 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/best.pt", conf
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Standalone LPR Model Inference Tool")
     parser.add_argument("image_path", nargs="?", default="test_images/car_test_2.jpg", help="Path to input test image")
-    parser.add_argument("--model", default="Models_yolo/best.pt", help="Path to YOLO11 detector weights")
+    parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to ONNX detector model (default: Models_yolo/best.onnx)")
     parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold (default: 0.25)")
     args = parser.parse_args()
 

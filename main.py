@@ -21,8 +21,10 @@ OUTPUTS_DIR = "Outputs"
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 # Initialize models once during startup to avoid reloading per request
-# Primary detector: fine-tuned license plate weights (Models_yolo/best.pt)
-model_path = "Models_yolo/best.pt" if os.path.exists("Models_yolo/best.pt") else "Models_yolo/yolov8n.pt"
+# Primary detector: fine-tuned license plate ONNX model (Models_yolo/best.onnx)
+model_path = "Models_yolo/best.onnx"
+if not os.path.exists(model_path):
+    raise FileNotFoundError(f"ONNX model not found: {model_path}. Please place exported ONNX weights in Models_yolo/.")
 primary_detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
 
 ocr = PaddleOCRAdapter(lang='en')
