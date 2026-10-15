@@ -22,15 +22,18 @@ OUTPUTS_DIR = "Outputs"
 BASELINE_DIR = os.path.join(OUTPUTS_DIR, "baseline_output")
 BENCH_DIR = os.path.join(OUTPUTS_DIR, "bench_test_output")
 REFINED_DIR = os.path.join(OUTPUTS_DIR, "refined_output")
+BALANCED_DIR = os.path.join(OUTPUTS_DIR, "balanced_output")
 
-for d in [OUTPUTS_DIR, BASELINE_DIR, BENCH_DIR, REFINED_DIR]:
+for d in [OUTPUTS_DIR, BASELINE_DIR, BENCH_DIR, REFINED_DIR, BALANCED_DIR]:
     os.makedirs(d, exist_ok=True)
 
 # Helper to determine target output folder based on model name
 def get_target_output_dir(model_name: str) -> str:
     m_lower = model_name.lower().replace("\\", "/")
     bname = os.path.basename(m_lower)
-    if "refined" in bname:
+    if "balanced" in bname:
+        return BALANCED_DIR
+    elif "refined" in bname:
         return REFINED_DIR
     elif bname in ["best.pt", "best.onnx"]:
         return BASELINE_DIR

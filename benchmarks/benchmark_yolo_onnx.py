@@ -120,11 +120,12 @@ def main():
         try2_count = sum(1 for r in current_model_rows if r['gate_status'] == "Try 2")
         closed_count = sum(1 for r in current_model_rows if r['gate_status'] == "Gate Closed")
 
-        avg_det_conf = sum(r['det_conf'] for r in current_model_rows) / n
-        avg_ocr_conf = sum(r['ocr_conf'] for r in current_model_rows) / n
-        avg_det_ms = sum(r['det_ms'] for r in current_model_rows) / n
-        avg_ocr_ms = sum(r['ocr_ms'] for r in current_model_rows) / n
-        avg_total_ms = sum(r['total_ms'] for r in current_model_rows) / n
+        # Segment cold-start (image 0) from steady-state (images 1..n)
+        cold_det_ms = current_model_rows[0]['det_ms']
+        steady_rows = current_model_rows[1:] if n > 1 else current_model_rows
+        avg_steady_det_ms = sum(r['det_ms'] for r in steady_rows) / len(steady_rows)
+        avg_steady_ocr_ms = sum(r['ocr_ms'] for r in steady_rows) / len(steady_rows)
+        avg_steady_total_ms = sum(r['total_ms'] for r in steady_rows) / len(steady_rows)
 
         model_summary_records.append({
             'model': model_name,
@@ -135,9 +136,10 @@ def main():
             'try1_passes': try1_count,
             'try2_passes': try2_count,
             'gate_closed': closed_count,
-            'avg_det_ms': avg_det_ms,
-            'avg_ocr_ms': avg_ocr_ms,
-            'avg_total_ms': avg_total_ms
+            'cold_det_ms': cold_det_ms,
+            'avg_steady_det_ms': avg_steady_det_ms,
+            'avg_steady_ocr_ms': avg_steady_ocr_ms,
+            'avg_steady_total_ms': avg_steady_total_ms
         })
 
     # Print Image-Level Details Table
@@ -156,11 +158,10 @@ def main():
     print("\n=========================================================================================================================")
     print("MODEL AGGREGATE SUMMARY (REAL MEASURED SCORES & LATENCY)")
     print("=========================================================================================================================")
-    print(f"{'ONNX Model':<19} | {'Plate Recall':<15} | {'Avg Det Conf':<12} | {'Gate Open Rate':<15} | {'Avg OCR Conf':<12} | {'Tries (1/2/Closed)':<18} | {'Avg Det ms':<10} | {'Avg Total ms':<12}")
+    print(f"{'ONNX Model':<19} | {'Plate Recall':<15} | {'Avg Det Conf':<12} | {'Gate Open':<11} | {'Cold Det ms':<12} | {'Steady Det ms':<14} | {'Steady Total ms':<16}")
     print("-" * 128)
     for m in model_summary_records:
-        tries_disp = f"{m['try1_passes']} / {m['try2_passes']} / {m['gate_closed']}"
-        print(f"{m['model']:<19} | {m['recall_rate']:<15} | {m['avg_det_conf']:>10.1f}% | {m['gate_open_rate']:<15} | {m['avg_ocr_conf']:>10.1f}% | {tries_disp:<18} | {m['avg_det_ms']:>8.1f} ms | {m['avg_total_ms']:>10.1f} ms")
+        print(f"{m['model']:<19} | {m['recall_rate']:<15} | {m['avg_det_conf']:>10.1f}% | {m['gate_open_rate']:<11} | {m['cold_det_ms']:>10.1f} ms | {m['avg_steady_det_ms']:>12.1f} ms | {m['avg_steady_total_ms']:>14.1f} ms")
     print("=========================================================================================================================\n")
 
     # Log clean Markdown table into BENCHMARK_SUMMARY.md
@@ -170,10 +171,10 @@ def main():
         table_md += f"*Evaluated at: `{timestamp_str}` across `{len(image_files)}` test images (Measured outputs and model confidence scores only)*\n\n"
         
         table_md += "### Model Summary\n\n"
-        table_md += "| ONNX Model | Plate Recall | Avg Det Conf % | Gate Open Rate | Avg OCR Conf % | Try 1 | Try 2 | Gate Closed | Avg Det (ms) | Avg Total (ms) |\n"
-        table_md += "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n"
+        table_md += "| ONNX Model | Plate Recall | Avg Det Conf % | Gate Open Rate | Avg OCR Conf % | Try 1 | Try 2 | Gate Closed | Cold Det (ms) | Steady Det (ms) | Steady Total (ms) |\n"
+        table_md += "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n"
         for m in model_summary_records:
-            table_md += f"| `{m['model']}` | {m['recall_rate']} | {m['avg_det_conf']:.1f}% | **{m['gate_open_rate']}** | {m['avg_ocr_conf']:.1f}% | {m['try1_passes']} | {m['try2_passes']} | {m['gate_closed']} | {m['avg_det_ms']:.1f} ms | **{m['avg_total_ms']:.1f} ms** |\n"
+            table_md += f"| `{m['model']}` | {m['recall_rate']} | {m['avg_det_conf']:.1f}% | **{m['gate_open_rate']}** | {m['avg_ocr_conf']:.1f}% | {m['try1_passes']} | {m['try2_passes']} | {m['gate_closed']} | {m['cold_det_ms']:.1f} ms | {m['avg_steady_det_ms']:.1f} ms | **{m['avg_steady_total_ms']:.1f} ms** |\n"
 
         table_md += "\n### Per-Image Real Outputs\n\n"
         table_md += "| Model | Image | Plate Detected (Conf %) | Valid Format (OCR Conf %) | Gate Status | Extracted Plate | Det (ms) | OCR (ms) | Total (ms) |\n"
