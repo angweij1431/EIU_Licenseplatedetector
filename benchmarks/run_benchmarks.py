@@ -119,7 +119,8 @@ print(f"  Syntax Validation Pass Rate : {(valid_count / total_imgs) * 100:.1f}% 
 print(f"  1st-Try Resolution Rate     : {(first_try_count / total_imgs) * 100:.1f}% ({first_try_count}/{total_imgs})")
 print(f"  2nd-Try Escalation Rate     : {(second_try_count / total_imgs) * 100:.1f}% ({second_try_count}/{total_imgs})")
 if total_imgs > 1:
-    print(f"  Average Steady-State Det ms : {avg_steady_det:.1f} ms (cold start excluded)")
+    print(f"  Cold-Start First Run Det ms : {results_list[0]['det_ms']:.1f} ms")
+    print(f"  Average Steady-State Det ms : {avg_steady_det:.1f} ms (without cold start)")
     print(f"  Average Steady-State OCR ms : {avg_steady_ocr:.1f} ms")
 else:
     print(f"  Detection Latency           : {avg_steady_det:.1f} ms")

@@ -13,7 +13,7 @@ from lpr_engine import (
 from lpr_core.validator import VietnamPlateValidator
 
 def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", conf_thresh: float = 0.25, 
-                  force_try2: bool = False, force_try3: bool = False):
+                  force_try2: bool = False, force_try3: bool = False, measure_warm: bool = True):
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Input image not found: {image_path}")
 
@@ -39,7 +39,8 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", co
         primary_only=True,
         padding_percent=0.20,
         force_second_try=force_try2,
-        force_third_try=force_try3
+        force_third_try=force_try3,
+        measure_warm=measure_warm
     )
     total_time = time.time() - start_time
 
@@ -83,9 +84,21 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", co
     print(f"  Template Similarity   : {format_similarity * 100:.1f}%")
     print("----------------------------------------------------------------------")
     print("3. Speed of execution:")
-    print(f"  YOLO11 Detection Time : {summary['detection_latency_ms']:.1f} ms")
-    print(f"  PaddleOCR Text Time   : {summary['ocr_latency_ms']:.1f} ms")
-    print(f"  Total Inference Time  : {total_time * 1000:.1f} ms ({total_time:.2f} seconds)")
+    if summary.get('cold_detection_latency_ms') is not None and summary.get('warm_detection_latency_ms') is not None:
+        cold_tot = summary['cold_total_latency_ms']
+        warm_tot = summary['warm_total_latency_ms']
+        print("  [Cold-Start - First Session Load]")
+        print(f"    YOLO Detection Time : {summary['cold_detection_latency_ms']:.1f} ms")
+        print(f"    PaddleOCR Text Time : {summary['cold_ocr_latency_ms']:.1f} ms")
+        print(f"    Total Pipeline Time : {cold_tot:.1f} ms ({cold_tot / 1000.0:.2f} seconds)")
+        print("  [Steady-State - Operational Gate Speed (Without Cold Start)]")
+        print(f"    YOLO Detection Time : {summary['warm_detection_latency_ms']:.1f} ms")
+        print(f"    PaddleOCR Text Time : {summary['warm_ocr_latency_ms']:.1f} ms")
+        print(f"    Total Pipeline Time : {warm_tot:.1f} ms ({warm_tot / 1000.0:.2f} seconds)")
+    else:
+        print(f"  YOLO Detection Time   : {summary['detection_latency_ms']:.1f} ms")
+        print(f"  PaddleOCR Text Time   : {summary['ocr_latency_ms']:.1f} ms")
+        print(f"  Total Inference Time  : {total_time * 1000:.1f} ms ({total_time:.2f} seconds)")
     print(f"  Saved Image with Box  : {summary['annotated_path']}")
     print("======================================================================\n")
 
@@ -98,6 +111,9 @@ if __name__ == "__main__":
     parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold (default: 0.25)")
     parser.add_argument("--force_try2", action="store_true", help="Force 2nd try adaptive image enhancement (CLAHE + upscale)")
     parser.add_argument("--force_try3", action="store_true", help="Force 3rd try deep zoom (1024px detector pass)")
+    parser.add_argument("--no_warm", action="store_true", help="Disable steady-state warm pass measurement (cold-start only)")
     args = parser.parse_args()
 
-    run_inference(args.image_path, model_path=args.model, conf_thresh=args.conf, force_try2=args.force_try2, force_try3=args.force_try3)
+    run_inference(args.image_path, model_path=args.model, conf_thresh=args.conf, 
+                  force_try2=args.force_try2, force_try3=args.force_try3, 
+                  measure_warm=not args.no_warm)

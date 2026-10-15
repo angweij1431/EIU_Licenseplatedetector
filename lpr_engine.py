@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import time
 import os
 import sys
+import re
 import cv2
 import numpy as np
 
@@ -36,26 +37,16 @@ def get_target_output_dir(model_name: str) -> str:
     else:
         return BENCH_DIR
 
-# Helper to generate unique, non-overwriting filenames (cleanly increments: _1 -> _2 -> _3)
+# Helper to generate unique, non-overwriting filenames (cleanly appends: _1 -> _2 -> _3 without mangling image names)
 def get_unique_filepath(directory: str, filename: str) -> str:
-    import re
     candidate = os.path.join(directory, filename)
     if not os.path.exists(candidate):
         return candidate
         
     stem, ext = os.path.splitext(filename)
-    
-    # Check if stem already ends with an underscore and digits (e.g. "image_1")
-    match = re.search(r'^(.*)_(\d+)$', stem)
-    if match:
-        base_stem = match.group(1)
-        counter = int(match.group(2)) + 1
-    else:
-        base_stem = stem
-        counter = 1
-        
+    counter = 1
     while True:
-        candidate = os.path.join(directory, f"{base_stem}_{counter}{ext}")
+        candidate = os.path.join(directory, f"{stem}_{counter}{ext}")
         if not os.path.exists(candidate):
             return candidate
         counter += 1
@@ -338,6 +329,8 @@ class LPRPipeline:
         self.detector = detector
         self.ocr = ocr
         self.enable_preprocessing = enable_preprocessing
+        self.fallback_detector = fallback_detector
+        self._is_first_run = True
     # ==============================================================================================
     # MULTI-VEHICLE / MULTI-PLATE SELECTION & CAMERA PERSPECTIVE LOGIC
     # ==============================================================================================
@@ -392,7 +385,7 @@ class LPRPipeline:
         return VietnamPlateValidator.clean_and_correct(joined).get('is_valid', False)
 
     # Crops plate bounding boxes and runs OCR (natural or enhanced)
-    def _crop_and_ocr(self, img, detections, crop_identifier, padding_percent, apply_enhancement=False, target_dir=OUTPUTS_DIR, model_tag="model"):
+    def _crop_and_ocr(self, img, detections, crop_identifier, padding_percent, apply_enhancement=False, target_dir=OUTPUTS_DIR, model_tag="model", save_crop=True):
         ocr_results = []
         was_enhanced = False
         if not detections or img is None:
@@ -438,9 +431,10 @@ class LPRPipeline:
                     final_crop = enhanced_crop
                     was_enhanced = True
                     
-                crop_filename = f"{model_tag}_crop_{crop_identifier}_{idx+1}.jpg"
-                crop_path = get_unique_filepath(target_dir, crop_filename)
-                cv2.imwrite(crop_path, final_crop)
+                if save_crop:
+                    crop_filename = f"{model_tag}_crop_{crop_identifier}_{idx+1}.jpg"
+                    crop_path = get_unique_filepath(target_dir, crop_filename)
+                    cv2.imwrite(crop_path, final_crop)
                 
                 for res in raw_text_results:
                     val_res = VietnamPlateValidator.clean_and_correct(res['text'])
@@ -454,8 +448,11 @@ class LPRPipeline:
     # Executes detection, cropping, preprocessing, OCR, and validation
     def process(self, image_path: str, save_annotated_name: str = "output_annotated.jpg", 
                 sort_by: str = 'front', primary_only: bool = True, padding_percent: float = 0.20,
-                force_second_try: bool = False, force_third_try: bool = False):
+                force_second_try: bool = False, force_third_try: bool = False,
+                measure_warm: bool = False):
         start_time = time.time()
+        is_cold_start = getattr(self, '_is_first_run', True)
+        self._is_first_run = False
         
         # Determine model tag and target output directory
         model_name = getattr(self.detector, 'model_name', 'yolo')
@@ -546,20 +543,128 @@ class LPRPipeline:
                 if not detections:
                     resolution = "1024px"
 
+        total_time_s = time.time() - start_time
+        total_time_ms = total_time_s * 1000
+
+        # Execute warm pass to measure steady-state if requested
+        warm_det_ms = None
+        warm_ocr_ms = None
+        warm_total_ms = None
+        if measure_warm:
+            print("  [Steady-State Measurement] Running warm pass (without cold start)...")
+            warm_t0 = time.time()
+            warm_det_t0 = time.time()
+            warm_res_imgsz = 1024 if resolution == "1024px" else 640
+            warm_dets = self.detector.detect(image_path, imgsz=warm_res_imgsz)
+            warm_dets = self._select_primary(warm_dets, sort_by, primary_only)
+            warm_det_ms = (time.time() - warm_det_t0) * 1000.0
+            
+            warm_ocr_ms = 0.0
+            if warm_dets:
+                warm_ocr_t0 = time.time()
+                self._crop_and_ocr(
+                    img, warm_dets, crop_identifier, padding_percent,
+                    apply_enhancement=(try_level == "2nd try" or was_enhanced),
+                    target_dir=target_dir, model_tag=model_stem, save_crop=False
+                )
+                warm_ocr_ms = (time.time() - warm_ocr_t0) * 1000.0
+            warm_total_ms = (time.time() - warm_t0) * 1000.0
+
+        if measure_warm:
+            cold_det_ms = det_latency_ms
+            cold_ocr_ms = ocr_latency_ms
+            cold_total_ms = total_time_ms
+        else:
+            cold_det_ms = det_latency_ms if is_cold_start else None
+            cold_ocr_ms = ocr_latency_ms if is_cold_start else None
+            cold_total_ms = total_time_ms if is_cold_start else None
+            warm_det_ms = det_latency_ms if not is_cold_start else None
+            warm_ocr_ms = ocr_latency_ms if not is_cold_start else None
+            warm_total_ms = total_time_ms if not is_cold_start else None
+
+        # Extract primary OCR plate text for visualization
+        plate_str = "NONE"
+        is_plate_valid = False
+        if ocr_results:
+            val_lines = [r.get('validated_text', r.get('text', '')) for r in ocr_results if r.get('text')]
+            joined = "".join(val_lines)
+            val_out = VietnamPlateValidator.clean_and_correct(joined)
+            plate_str = val_out['text']
+            is_plate_valid = val_out['is_valid']
+
+        # Determine run tag from filename (e.g. "Run #1", "Run #2")
+        stem_out = os.path.splitext(os.path.basename(output_file_path))[0]
+        orig_stem = os.path.splitext(annotated_base)[0]
+        if stem_out == orig_stem:
+            run_tag = "Run #1"
+        elif stem_out.startswith(orig_stem + "_"):
+            suffix_num = stem_out[len(orig_stem) + 1:]
+            run_tag = f"Run #{int(suffix_num) + 1}" if suffix_num.isdigit() else "Run #1"
+        else:
+            run_tag = "Run #1"
+
         # Generate annotated visualization
         annotated_img = img.copy()
+        img_h, img_w = annotated_img.shape[:2]
+
+        # Formulate HUD text lines
+        hud_line1 = f"Model: {model_stem} | {run_tag} | Status: {try_level} ({resolution})"
+        if measure_warm:
+            hud_line2 = f"Cold: {cold_total_ms:.0f}ms (Det: {cold_det_ms:.0f}ms) | Warm: {warm_total_ms:.0f}ms (Det: {warm_det_ms:.0f}ms)"
+        elif is_cold_start:
+            hud_line2 = f"Latency (Cold-Start): {total_time_ms:.0f}ms (Det: {det_latency_ms:.0f}ms, OCR: {ocr_latency_ms:.0f}ms)"
+        else:
+            hud_line2 = f"Latency (Steady-State): {total_time_ms:.0f}ms (Det: {det_latency_ms:.0f}ms, OCR: {ocr_latency_ms:.0f}ms)"
+
+        # Draw top HUD metadata bar (2 lines, slight transparent background, green text)
+        font_scale = max(0.38, min(0.62, img_w / 1400.0))
+        thickness = 1 if font_scale < 0.6 else 2
+
+        # Ensure HUD lines never exceed image width
+        while font_scale > 0.28:
+            (w1, _), _ = cv2.getTextSize(hud_line1, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+            (w2, _), _ = cv2.getTextSize(hud_line2, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+            if max(w1, w2) <= img_w - 24:
+                break
+            font_scale -= 0.02
+
+        (test_w, text_h), _ = cv2.getTextSize("Model: Sample", cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+        line_gap = int(text_h * 0.75)
+        hud_h = int((text_h * 2) + (line_gap * 3) + 8)
+        y_line1 = int(line_gap + text_h + 2)
+        y_line2 = int(y_line1 + text_h + line_gap + 2)
+
+        # Slight transparent dark background
+        overlay = annotated_img.copy()
+        cv2.rectangle(overlay, (0, 0), (img_w, hud_h), (12, 18, 12), -1)
+        cv2.addWeighted(overlay, 0.55, annotated_img, 0.45, 0, annotated_img)
+
+        # HUD 2-line green text
+        hud_color = (0, 255, 0) # High-contrast green
+        cv2.putText(annotated_img, hud_line1, (12, y_line1), 
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, hud_color, thickness, cv2.LINE_AA)
+        cv2.putText(annotated_img, hud_line2, (12, y_line2), 
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, hud_color, thickness, cv2.LINE_AA)
+
+        # Draw bounding boxes and plate text labels
         if detections:
             for idx, d in enumerate(detections):
                 x1, y1, x2, y2 = map(int, d['box'])
-                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                label_text = f"#{idx+1} {d['class']} {d['confidence']:.2f} ({try_level})"
-                cv2.putText(annotated_img, label_text, (x1, max(15, y1 - 5)), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
+                box_color = (0, 220, 0) if is_plate_valid else (0, 165, 255) # Green if valid, Orange if unverified
+                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), box_color, 2)
+                
+                # Bounding box tag: "[PLATE] | [CONF]%"
+                tag_text = f"{plate_str} ({d['confidence'] * 100:.1f}%)" if (idx == 0 and plate_str != "NONE") else f"{d['class']} ({d['confidence'] * 100:.1f}%)"
+                (tw, th), _ = cv2.getTextSize(tag_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+                
+                # Tag background rectangle
+                tag_y1 = max(hud_h + 5, y1 - th - 8)
+                cv2.rectangle(annotated_img, (x1, tag_y1), (x1 + tw + 8, tag_y1 + th + 6), box_color, -1)
+                cv2.putText(annotated_img, tag_text, (x1 + 4, tag_y1 + th + 2), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 2, cv2.LINE_AA)
                             
         cv2.imwrite(output_file_path, annotated_img)
         print(f"Visualization saved to: {output_file_path}")
-
-        total_time_s = time.time() - start_time
         
         return {
             'detector': self.detector.__class__.__name__,
@@ -568,8 +673,14 @@ class LPRPipeline:
             'ocr': self.ocr.__class__.__name__,
             'detections': detections,
             'ocr_results': ocr_results,
-            'detection_latency_ms': det_latency_ms,
-            'ocr_latency_ms': ocr_latency_ms,
-            'total_time_s': total_time_s,
+            'detection_latency_ms': warm_det_ms if measure_warm else det_latency_ms,
+            'ocr_latency_ms': warm_ocr_ms if measure_warm else ocr_latency_ms,
+            'total_time_s': (warm_total_ms / 1000.0) if measure_warm else total_time_s,
+            'cold_detection_latency_ms': cold_det_ms,
+            'cold_ocr_latency_ms': cold_ocr_ms,
+            'cold_total_latency_ms': cold_total_ms,
+            'warm_detection_latency_ms': warm_det_ms,
+            'warm_ocr_latency_ms': warm_ocr_ms,
+            'warm_total_latency_ms': warm_total_ms,
             'annotated_path': output_file_path
         }
