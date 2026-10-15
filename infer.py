@@ -12,7 +12,8 @@ from lpr_engine import (
 )
 from lpr_core.validator import VietnamPlateValidator
 
-def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", conf_thresh: float = 0.25):
+def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", conf_thresh: float = 0.25, 
+                  force_try2: bool = False, force_try3: bool = False):
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Input image not found: {image_path}")
 
@@ -36,7 +37,9 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", co
         save_annotated_name=output_filename,
         sort_by='front', # this one determines the order of the detected plates if multiple are found
         primary_only=True,
-        padding_percent=0.20
+        padding_percent=0.20,
+        force_second_try=force_try2,
+        force_third_try=force_try3
     )
     total_time = time.time() - start_time
 
@@ -48,17 +51,17 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", co
     if summary['ocr_results']:
         raw_lines = [r['text'] for r in summary['ocr_results']]
         val_lines = [r['validated_text'] for r in summary['ocr_results']]
-        joined_text = "-".join(val_lines) if len(val_lines) > 1 else val_lines[0]
+        joined_text = "".join(val_lines)
         final_val = VietnamPlateValidator.clean_and_correct(joined_text)
         extracted_text = final_val['text']
         is_valid = final_val['is_valid']
         format_similarity = final_val.get('format_similarity', 0.0)
 
     print("\n======================================================================")
-    print("final resutss")
+    print("FINAL RESULTS")
     print("======================================================================")
     print(f"Input Image             : {image_path}")
-    print(f"Plate Detection Model   : YOLO11 ({model_path})")
+    print(f"Plate Detection Model   : {model_path}")
     print(f"Text Recognition Model  : PaddleOCR")
     print(f"Pipeline Escalation Path: {summary['try_level']} ({summary['resolution']})")
     print("----------------------------------------------------------------------")
@@ -90,9 +93,11 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/best.onnx", co
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Standalone LPR Model Inference Tool")
-    parser.add_argument("image_path", nargs="?", default="test_images/car_test_2.jpg", help="Path to input test image")
+    parser.add_argument("--image_path", nargs="?", default="test_images/car_test_2.jpg", help="Path to input test image")
     parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to ONNX detector model (default: Models_yolo/best.onnx)")
     parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold (default: 0.25)")
+    parser.add_argument("--force_try2", action="store_true", help="Force 2nd try adaptive image enhancement (CLAHE + upscale)")
+    parser.add_argument("--force_try3", action="store_true", help="Force 3rd try deep zoom (1024px detector pass)")
     args = parser.parse_args()
 
-    run_inference(args.image_path, model_path=args.model, conf_thresh=args.conf)
+    run_inference(args.image_path, model_path=args.model, conf_thresh=args.conf, force_try2=args.force_try2, force_try3=args.force_try3)

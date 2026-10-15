@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import time
 import os
 import sys
-import psutil
 import cv2
 import numpy as np
 
@@ -17,17 +16,52 @@ if sys.platform == 'win32':
     except Exception:
         pass
 
-# Output directory for saving visualizations and preprocessed crops
+# Output directories for organized storage
 OUTPUTS_DIR = "Outputs"
-os.makedirs(OUTPUTS_DIR, exist_ok=True)
+BASELINE_DIR = os.path.join(OUTPUTS_DIR, "baseline_output")
+BENCH_DIR = os.path.join(OUTPUTS_DIR, "bench_test_output")
+REFINED_DIR = os.path.join(OUTPUTS_DIR, "refined_output")
 
-# Memory tracking helper (measures resident set size in megabytes)
-def get_ram_usage_mb():
-    process = psutil.Process(os.getpid())
-    return process.memory_info().rss / (1024 * 1024)
+for d in [OUTPUTS_DIR, BASELINE_DIR, BENCH_DIR, REFINED_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+# Helper to determine target output folder based on model name
+def get_target_output_dir(model_name: str) -> str:
+    m_lower = model_name.lower().replace("\\", "/")
+    bname = os.path.basename(m_lower)
+    if "refined" in bname:
+        return REFINED_DIR
+    elif bname in ["best.pt", "best.onnx"]:
+        return BASELINE_DIR
+    else:
+        return BENCH_DIR
+
+# Helper to generate unique, non-overwriting filenames (cleanly increments: _1 -> _2 -> _3)
+def get_unique_filepath(directory: str, filename: str) -> str:
+    import re
+    candidate = os.path.join(directory, filename)
+    if not os.path.exists(candidate):
+        return candidate
+        
+    stem, ext = os.path.splitext(filename)
+    
+    # Check if stem already ends with an underscore and digits (e.g. "image_1")
+    match = re.search(r'^(.*)_(\d+)$', stem)
+    if match:
+        base_stem = match.group(1)
+        counter = int(match.group(2)) + 1
+    else:
+        base_stem = stem
+        counter = 1
+        
+    while True:
+        candidate = os.path.join(directory, f"{base_stem}_{counter}{ext}")
+        if not os.path.exists(candidate):
+            return candidate
+        counter += 1
 
 # Vehicle target classes for object filtering
-VEHICLE_CLASSES = ['car', 'motorcycle', 'bus', 'truck', 'license_plate', 'plate']
+VEHICLE_CLASSES = ['license_plate', 'plate'] # cleaned plate
 
 
 # Abstract base class for detection models
@@ -95,14 +129,19 @@ class YOLODetector(BaseDetector):
         return detections
 
 
-# Backward-compatible alias
-YOLOv8Detector = YOLODetector
-
-
 # PaddleOCR model adapter
 class PaddleOCRAdapter(BaseOCR):
     # Initializes PaddleOCR with streamlined settings
     def __init__(self, lang: str = 'en', mode: str = 'full'):
+        import logging
+        import warnings
+        warnings.filterwarnings("ignore", category=UserWarning)
+        
+        # Suppress Paddle and PaddleX internal logging bloat
+        os.environ["FLAGS_allocator_strategy"] = "auto_growth"
+        os.environ["GLOG_minloglevel"] = "2"
+        logging.getLogger("ppocr").setLevel(logging.ERROR)
+        
         import torch
         from paddleocr import PaddleOCR
         self.mode = mode.lower()
@@ -299,20 +338,46 @@ class LPRPipeline:
         self.detector = detector
         self.ocr = ocr
         self.enable_preprocessing = enable_preprocessing
-        self.fallback_detector = fallback_detector
-        
-    # Selects target vehicle / plate based on sorting criteria
+    # ==============================================================================================
+    # MULTI-VEHICLE / MULTI-PLATE SELECTION & CAMERA PERSPECTIVE LOGIC
+    # ==============================================================================================
+    # When multiple vehicles or plates appear in a single frame (e.g. queuing at a gate barrier),
+    # YOLO detects ALL bounding boxes. This function filters and picks the TARGET plate for OCR.
+    #
+    # CUSTOMIZE BASED ON YOUR CAMERA SETUP:
+    # 1. Overhead Boom Barrier Camera (Pointing down at approaching lane):
+    #    -> Use sort_by='front': The vehicle closest to the boom gate is at the bottom of the
+    #       image frame (highest y2 pixel coordinate). Detections are sorted by y2 descending.
+    #
+    # 2. Side-Mounted Toll Booth Camera:
+    #    -> Use sort_by='area': The vehicle closest to the booth has the largest bounding box area.
+    #
+    # 3. High-Angle Distance Camera:
+    #    -> Use sort_by='confidence': Selects the cleanest, most confident plate detected.
+    #
+    # To process ALL queuing vehicles simultaneously:
+    #    -> Set primary_only=False (returns the full sorted list of all plates in frame).
+    # ==============================================================================================
     def _select_primary(self, detections, sort_by='front', primary_only=True):
         if not detections:
             return []
+            
+        # Strategy A: Bottom-most bounding box in frame (closest foreground vehicle)
         if sort_by == 'front':
             detections = sorted(detections, key=lambda d: d['box'][3], reverse=True)
+            
+        # Strategy B: Largest bounding box area (closest vehicle by physical size)
         elif sort_by == 'area':
             detections = sorted(detections, key=lambda d: (d['box'][2]-d['box'][0])*(d['box'][3]-d['box'][1]), reverse=True)
+            
+        # Strategy C: Highest neural detector confidence
         elif sort_by == 'confidence':
             detections = sorted(detections, key=lambda d: d['confidence'], reverse=True)
+            
+        # If primary_only is True, gate controller only triggers on the single primary vehicle
         if primary_only and detections:
             return [detections[0]]
+            
         return detections
 
     # Checks whether extracted OCR results strictly match Vietnamese plate syntax
@@ -327,10 +392,11 @@ class LPRPipeline:
         return VietnamPlateValidator.clean_and_correct(joined).get('is_valid', False)
 
     # Crops plate bounding boxes and runs OCR (natural or enhanced)
-    def _crop_and_ocr(self, img, detections, crop_identifier, padding_percent, apply_enhancement=False):
+    def _crop_and_ocr(self, img, detections, crop_identifier, padding_percent, apply_enhancement=False, target_dir=OUTPUTS_DIR, model_tag="model"):
         ocr_results = []
+        was_enhanced = False
         if not detections or img is None:
-            return ocr_results
+            return ocr_results, was_enhanced
             
         for idx, d in enumerate(detections):
             x1, y1, x2, y2 = map(int, d['box'])
@@ -346,19 +412,34 @@ class LPRPipeline:
             crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
             if crop.size > 0:
                 final_crop = crop
+                crop_h, crop_w = crop.shape[:2]
+                blur_score = PlatePreprocessor.compute_blur_score(crop)
+                
+                # Adaptive Trigger: Trigger enhancement if crop is small/low-res (< 110x60) OR blurry (< 150)
+                is_low_res = (crop_w < 110 or crop_h < 60) # MANUALLY INPUTTED PIXEL THAT IS RELEVANT TO THE 640X640 
+                is_blurry = (blur_score < 150.0) or is_low_res
+                
                 if not apply_enhancement:
-                    # 1st try: 100% natural crop (zero filters to preserve clean character curves)
-                    print("  [1st try - Fast Pass] Natural crop evaluated with zero enhancement filters")
-                    raw_text_results = self.ocr.recognize(crop)
+                    if is_blurry and self.enable_preprocessing:
+                        reason = f"low resolution ({crop_w}x{crop_h})" if is_low_res else f"sharpness {blur_score:.1f} < 150.0"
+                        print(f"  [Adaptive Recovery] Plate needs enhancement ({reason}). Auto-applying stroke & resolution recovery...")
+                        enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
+                        raw_text_results = self.ocr.recognize(enhanced_crop)
+                        final_crop = enhanced_crop
+                        was_enhanced = True
+                    else:
+                        print(f"  [1st try - Fast Pass] Natural crop evaluated (size: {crop_w}x{crop_h}, sharpness: {blur_score:.1f})")
+                        raw_text_results = self.ocr.recognize(crop)
                 else:
-                    # 2nd try: Image enhancement fallback (CLAHE, bilateral filter, dynamic upscale)
-                    print("  [2nd try - Enhancement Pass] Applying adaptive image enhancement (CLAHE + upscale)...")
+                    # 2nd try: Explicit escalation or forced enhancement
+                    print(f"  [2nd try - Enhancement Pass] Applying adaptive image enhancement (sharpness: {blur_score:.1f})...")
                     enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
                     raw_text_results = self.ocr.recognize(enhanced_crop)
                     final_crop = enhanced_crop
+                    was_enhanced = True
                     
-                crop_filename = f"crop_{crop_identifier}_{idx+1}.jpg"
-                crop_path = os.path.join(OUTPUTS_DIR, crop_filename)
+                crop_filename = f"{model_tag}_crop_{crop_identifier}_{idx+1}.jpg"
+                crop_path = get_unique_filepath(target_dir, crop_filename)
                 cv2.imwrite(crop_path, final_crop)
                 
                 for res in raw_text_results:
@@ -368,18 +449,32 @@ class LPRPipeline:
                     res['format_similarity'] = val_res.get('format_similarity', 0.0)
                     res['is_format_similar'] = val_res.get('is_format_similar', False)
                     ocr_results.append(res)
-        return ocr_results
+        return ocr_results, was_enhanced
 
     # Executes detection, cropping, preprocessing, OCR, and validation
     def process(self, image_path: str, save_annotated_name: str = "output_annotated.jpg", 
-                sort_by: str = 'front', primary_only: bool = True, padding_percent: float = 0.20):
+                sort_by: str = 'front', primary_only: bool = True, padding_percent: float = 0.20,
+                force_second_try: bool = False, force_third_try: bool = False):
         start_time = time.time()
-        output_file_path = os.path.join(OUTPUTS_DIR, os.path.basename(save_annotated_name))
-        crop_identifier = os.path.splitext(os.path.basename(save_annotated_name))[0]
+        
+        # Determine model tag and target output directory
+        model_name = getattr(self.detector, 'model_name', 'yolo')
+        model_stem = os.path.splitext(os.path.basename(model_name))[0]
+        target_dir = get_target_output_dir(model_name)
+        
+        img_stem = os.path.splitext(os.path.basename(image_path))[0]
+        annotated_base = f"{model_stem}_output_{img_stem}.jpg"
+        output_file_path = get_unique_filepath(target_dir, annotated_base)
+        crop_identifier = img_stem
         
         print(f"Processing image: {image_path}")
-        print(f"Detector: {self.detector.__class__.__name__} | OCR: {self.ocr.__class__.__name__}")
+        print(f"Detector: {self.detector.__class__.__name__} ({model_stem}) | OCR: {self.ocr.__class__.__name__}")
         print(f"Adaptive enhancement capability: {'Enabled' if self.enable_preprocessing else 'Disabled'}")
+        if force_third_try:
+            print("Mode: FORCED 3rd try (1024px Deep Zoom + OCR)")
+        elif force_second_try:
+            print("Mode: FORCED 2nd try (Adaptive Enhancement)")
+        print(f"Output directory: {target_dir}")
             
         img = cv2.imread(image_path)
         if img is None:
@@ -389,37 +484,49 @@ class LPRPipeline:
         det_start = time.time()
         try_level = "1st try"
         resolution = "640px"
+        print(f"  [1st try - 640px] Running base detector...")
         detections = self.detector.detect(image_path, imgsz=640)
         detections = self._select_primary(detections, sort_by, primary_only)
         det_latency_ms = (time.time() - det_start) * 1000
+        print(f"  [1st try - 640px] Found {len(detections)} detection(s) in {det_latency_ms:.1f}ms")
         
         ocr_start = time.time()
-        ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=False)
+        ocr_results, was_enhanced = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=False, target_dir=target_dir, model_tag=model_stem)
         ocr_latency_ms = (time.time() - ocr_start) * 1000
+        
+        # If blur enhancement was needed to read the plate, mark it honestly as 2nd try
+        if was_enhanced:
+            try_level = "2nd try"
         
         # Check if 1st try succeeded: confident detection + strictly valid syntax from natural crop
         first_try_ok = (
             bool(detections) and 
             detections[0]['confidence'] >= 0.25 and 
-            self._is_strictly_valid(ocr_results)
+            self._is_strictly_valid(ocr_results) and
+            not force_second_try and
+            not force_third_try
         )
         
         # 2nd try: Adaptive enhancement pass on the existing crop
-        # Triggered if 1st try detected a box (>= 0.25) but OCR syntax was invalid or low confidence
-        if not first_try_ok and detections and detections[0]['confidence'] >= 0.25 and self.enable_preprocessing:
-            print("Notice: 1st try unverified. Escalating to 2nd try (Adaptive Enhancement)...")
+        # Triggered if 1st try detected a box (>= 0.25) but OCR syntax was invalid, or force_second_try is requested
+        if (not first_try_ok or force_second_try) and not force_third_try and detections and detections[0]['confidence'] >= 0.25 and self.enable_preprocessing:
+            reason = "Forced 2nd try requested" if force_second_try else "1st try unverified"
+            print(f"  [2nd try - Adaptive Enhancement] {reason}. Running enhancement on existing crop...")
             ocr_start_enh = time.time()
-            enh_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True)
+            enh_results, _ = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True, target_dir=target_dir, model_tag=model_stem)
             ocr_latency_ms += (time.time() - ocr_start_enh) * 1000
-            if self._is_strictly_valid(enh_results) or len(enh_results) > len(ocr_results):
+            if force_second_try or self._is_strictly_valid(enh_results) or len(enh_results) > len(ocr_results):
                 ocr_results = enh_results
                 try_level = "2nd try"
-                print(f"2nd try succeeded: Image enhancement recovered valid plate | Conf: {detections[0]['confidence']:.2f}")
+                print(f"  [2nd try - Succeeded] Image enhancement executed | Conf: {detections[0]['confidence']:.2f}")
+        elif not detections:
+            print("  [2nd try] Skipped (no plate detected in 1st try to enhance).")
 
         # 3rd try: High-resolution zoom pass (1024px)
-        # Triggered if 1st/2nd try still have 0 detections or unverified syntax
-        if not self._is_strictly_valid(ocr_results):
-            print("Notice: Syntax unverified or 0 detections. Escalating to 3rd try (1024px Deep Zoom)...")
+        # Triggered if 1st/2nd try still have 0 detections or unverified syntax, or force_third_try is requested
+        if not self._is_strictly_valid(ocr_results) or force_third_try:
+            reason = "Forced 3rd try requested" if force_third_try else "Syntax unverified or 0 detections"
+            print(f"Notice: {reason}. Escalating to 3rd try (1024px Deep Zoom)...")
             resolution = "1024px"
             det_start_2 = time.time()
             zoom_detections = self.detector.detect(image_path, imgsz=1024)
@@ -430,13 +537,14 @@ class LPRPipeline:
                 detections = zoom_detections
                 try_level = "3rd try"
                 ocr_start_2 = time.time()
-                ocr_results = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=self.enable_preprocessing)
+                ocr_results, _ = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=self.enable_preprocessing, target_dir=target_dir, model_tag=model_stem)
                 ocr_latency_ms += (time.time() - ocr_start_2) * 1000
                 print(f"3rd try succeeded: Found plate at 1024px zoom | Conf: {detections[0]['confidence']:.2f}")
             else:
-                print("Notice: 3rd try (1024px zoom) found 0 detections.")
+                try_level = "3rd try (exhausted)"
+                print("Notice: 3rd try (1024px zoom) found 0 detections. All tries exhausted.")
                 if not detections:
-                    resolution = "none"
+                    resolution = "1024px"
 
         # Generate annotated visualization
         annotated_img = img.copy()
@@ -452,7 +560,6 @@ class LPRPipeline:
         print(f"Visualization saved to: {output_file_path}")
 
         total_time_s = time.time() - start_time
-        end_ram = get_ram_usage_mb()
         
         return {
             'detector': self.detector.__class__.__name__,
@@ -464,6 +571,5 @@ class LPRPipeline:
             'detection_latency_ms': det_latency_ms,
             'ocr_latency_ms': ocr_latency_ms,
             'total_time_s': total_time_s,
-            'ram_usage_mb': end_ram,
             'annotated_path': output_file_path
         }

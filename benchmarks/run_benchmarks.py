@@ -12,7 +12,6 @@ if PROJECT_ROOT not in sys.path:
 # Import modular pipeline adapters from lpr_engine
 from lpr_engine import (
     YOLODetector, 
-    PaddleOCRAdapter, 
     LPRPipeline,
     get_ocr_adapter
 )
@@ -76,7 +75,7 @@ for idx, img_path in enumerate(image_files):
     if summary['ocr_results']:
         raw_lines = [r['text'] for r in summary['ocr_results']]
         val_lines = [r['validated_text'] for r in summary['ocr_results']]
-        joined_text = "-".join(val_lines) if len(val_lines) > 1 else val_lines[0]
+        joined_text = "".join(val_lines)
         final_val = VietnamPlateValidator.clean_and_correct(joined_text)
         extracted_text = final_val['text']
         is_valid = final_val['is_valid']
@@ -95,10 +94,10 @@ for idx, img_path in enumerate(image_files):
 
 # Print aggregate summary report
 print("\nBenchmark Summary Report:")
-print(f"{'Image':<18} | {'Try Level':<10} | {'Resolution':<10} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
+print(f"{'Image':<22} | {'Try Escalation':<20} | {'Resolution':<10} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
 for r in results_list:
     valid_str = "YES" if r['valid'] else "NO"
-    print(f"{r['image']:<18} | {r['try_level']:<10} | {r['resolution']:<10} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
+    print(f"{r['image']:<22} | {r['try_level']:<20} | {r['resolution']:<10} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
 
 # Compute aggregate evaluation metrics
 total_imgs = len(results_list)

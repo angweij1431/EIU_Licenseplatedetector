@@ -84,7 +84,7 @@ def main():
                 ocr_conf = (sum(ocr_confs) / len(ocr_confs)) * 100.0 if ocr_confs else 0.0
 
                 val_lines = [r.get('validated_text', r.get('text', '')) for r in summary['ocr_results']]
-                joined = "-".join(val_lines) if len(val_lines) > 1 else (val_lines[0] if val_lines else "")
+                joined = "".join(val_lines)
                 final_val = VietnamPlateValidator.clean_and_correct(joined)
                 extracted_text = final_val['text']
                 is_valid = final_val['is_valid']

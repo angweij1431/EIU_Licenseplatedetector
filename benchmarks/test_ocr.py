@@ -82,7 +82,7 @@ def run_ocr_test(image_path: str, model_path: str = "Models_yolo/best.onnx"):
         print(f"Saved Line 2 Crop       : {slice2_path}")
     else:
         # 1-line long plate
-        cv2.imwrite(slice1_path, crop)
+        cv2.imwrite(slice1_path, crop)  
         print("Plate Format Detected   : 1-Line (Long Plate)")
         print(f"Saved Line Crop         : {slice1_path}")
 
