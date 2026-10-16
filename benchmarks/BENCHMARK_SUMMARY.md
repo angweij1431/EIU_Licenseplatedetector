@@ -373,3 +373,29 @@ updated benchmark tests for 15 oct with new test images incl neg samples and bic
 | `yolov8n.onnx` | `neg_sample_test_4.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 155.2 | 0.0 | 181.5 |
 | `yolov8n.onnx` | `neg_sample_test_5.jpg` | NO (0.0%) | NO (0.0%) | **Gate Closed** | `NONE` | 160.9 | 0.0 | 186.0 |
 
+
+## 7. Dynamic Evaluation History
+
+| Timestamp | Test Image | Try Level | Resolution | Boxes | Plate Text | Valid Format | Det (ms) | OCR (ms) |
+| :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: | :---: |
+| 2026-10-16 12:53:06 | `bike_test_11.jpg` | 3rd try | 1024px | 1 | `8438` | NO | 5258.7 | 566.1 |
+| 2026-10-16 12:53:47 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `0445499` | NO | 5305.8 | 579.6 |
+| 2026-10-16 12:55:13 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `05D49` | NO | 5076.9 | 511.8 |
+| 2026-10-16 12:58:00 | `bike_test_11.jpg` | 3rd try | 1024px | 1 | `638318385335` | NO | 4082.0 | 1070.1 |
+| 2026-10-16 13:03:51 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `565555555` | NO | 3460.5 | 879.0 |
+| 2026-10-16 15:13:55 | `bike_test_10.jpg` | 3rd try | 1024px | 1 | `8539088999929` | NO | 6635.4 | 840.1 |
+| 2026-10-16 15:13:55 | `bike_test_11.jpg` | 3rd try | 1024px | 1 | `638318385335` | NO | 900.0 | 787.2 |
+| 2026-10-16 15:13:55 | `bike_test_12.jpg` | 3rd try | 1024px | 1 | `135595` | NO | 1003.0 | 746.8 |
+| 2026-10-16 15:13:55 | `bike_test_9.jpg` | 3rd try | 1024px | 1 | `6BZ674420664` | NO | 827.3 | 612.7 |
+| 2026-10-16 15:13:55 | `car_test_2.jpg` | 3rd try | 1024px | 1 | `261` | NO | 933.8 | 773.6 |
+| 2026-10-16 15:13:55 | `car_test_3.jpg` | 3rd try | 1024px | 1 | `F5F263` | NO | 677.7 | 638.2 |
+| 2026-10-16 15:13:55 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `565555555` | NO | 599.6 | 697.9 |
+| 2026-10-16 15:13:55 | `car_test_5.jpg` | 3rd try | 1024px | 1 | `15337` | NO | 717.0 | 618.0 |
+| 2026-10-16 15:13:55 | `car_test_6.jpg` | 3rd try | 1024px | 1 | `57A9` | NO | 870.6 | 640.6 |
+| 2026-10-16 15:13:55 | `car_test_7.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 859.4 | 0.0 |
+| 2026-10-16 15:13:55 | `car_test_8.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 189.4 | 0.0 |
+| 2026-10-16 15:13:55 | `neg_sample_test_1.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 206.6 | 0.0 |
+| 2026-10-16 15:13:55 | `neg_sample_test_2.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 172.4 | 0.7 |
+| 2026-10-16 15:13:55 | `neg_sample_test_3.jpg` | 3rd try | 1024px | 1 | `583F55` | NO | 328.1 | 734.1 |
+| 2026-10-16 15:13:55 | `neg_sample_test_4.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 696.3 | 0.0 |
+| 2026-10-16 15:13:55 | `neg_sample_test_5.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 185.9 | 0.0 |
