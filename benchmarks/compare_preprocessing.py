@@ -3,7 +3,11 @@ import sys
 import time
 import argparse
 import cv2
-import numpy as np
+
+# Allow importing lpr_engine and lpr_core from the project root directory
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # Import core modules
 from lpr_engine import YOLODetector, PaddleOCRAdapter
@@ -17,6 +21,7 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 # Parse command line argument for test image path
 parser = argparse.ArgumentParser(description="LPR Preprocessing Comparison (Raw vs Enhanced)")
 parser.add_argument("image", nargs="?", default="test_images/car_test_3.jpg", help="Path to input test image (default: test_images/car_test_3.jpg)")
+parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to ONNX detector model (default: Models_yolo/best.onnx)")
 args = parser.parse_args()
 
 image_path = args.image
@@ -26,7 +31,10 @@ if not os.path.exists(image_path):
 print(f"Running Preprocessing Comparison on: {image_path}")
 
 # Initialize detector and OCR model
-model_path = "Models_yolo/best.pt" if os.path.exists("Models_yolo/best.pt") else "Models_yolo/yolov8n.pt"
+model_path = args.model
+if not os.path.exists(model_path):
+    raise FileNotFoundError(f"ONNX model not found: {model_path}. Please place exported ONNX weights in Models_yolo/.")
+
 detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
 ocr = PaddleOCRAdapter(lang='en')
 

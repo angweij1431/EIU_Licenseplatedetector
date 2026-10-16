@@ -4,6 +4,14 @@ import numpy as np
 # Computer Vision Preprocessing Pipeline for License Plate OCR
 class PlatePreprocessor:
     @staticmethod
+    def compute_blur_score(crop_bgr: np.ndarray) -> float:
+        """Computes Laplacian variance sharpness score (lower = blurrier, < 150 = blurred)."""
+        if crop_bgr is None or crop_bgr.size == 0:
+            return 0.0
+        gray = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2GRAY) if len(crop_bgr.shape) == 3 else crop_bgr
+        return float(cv2.Laplacian(gray, cv2.CV_64F).var())
+
+    @staticmethod
     def enhance_for_ocr(crop_bgr: np.ndarray, clip_limit: float = 2.0) -> np.ndarray:
         if crop_bgr is None or crop_bgr.size == 0:
             return crop_bgr
@@ -27,10 +35,15 @@ class PlatePreprocessor:
         # Step 5: Bilateral filter to smooth background noise while preserving character edges
         denoised = cv2.bilateralFilter(contrast_enhanced, d=7, sigmaColor=50, sigmaSpace=50)
 
-        # Step 6: High-pass unsharp masking kernel to sharpen character boundaries
-        sharpening_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
-        sharpened = cv2.filter2D(denoised, -1, sharpening_kernel)
+        # Step 6: Morphological reconstruction to close faint or broken loops on digits like 8, 0, B
+        # In a light background plate, text is dark. Morphological erosion on grayscale darkens and thickens strokes.
+        morph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        thickened = cv2.erode(denoised, morph_kernel, iterations=1)
 
-        # Step 7: Convert back to 3-channel BGR format expected by PaddleOCR
+        # Step 7: High-pass unsharp masking kernel to sharpen character boundaries
+        sharpening_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
+        sharpened = cv2.filter2D(thickened, -1, sharpening_kernel)
+
+        # Step 8: Convert back to 3-channel BGR format expected by PaddleOCR
         enhanced_bgr = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)
         return enhanced_bgr

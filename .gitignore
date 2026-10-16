@@ -9,17 +9,28 @@ env/
 # *.pt
 *.onnx
 *.engine
+*.pth
 # Models_yolo/
 
 # Python Cache & Outputs
 __pycache__/
 *.pyc
-# Outputs/
 .ipynb_checkpoints/
+
+# Ignore all generated test output images, but keep folder structure via .gitkeep
+Outputs/**/*.jpg
+Outputs/**/*.png
+Outputs/*.jpg
+Outputs/*.png
+!Outputs/**/.gitkeep
+!Outputs/.gitkeep
+
+# Ignore local test images (uncomment if you don't want test images tracked in git)
+# test_images/
 
 # Environment / API Keys
 .env
 
-# local ide settinsgs
+# Local IDE settings
 .vscode/
 .idea/

@@ -1,31 +1,44 @@
 import os
 import sys
-import time
 import argparse
 import glob
 from datetime import datetime
 
+# Allow importing lpr_engine and lpr_core from the project root directory
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 # Import modular pipeline adapters from lpr_engine
 from lpr_engine import (
     YOLODetector, 
-    PaddleOCRAdapter, 
-    LPRPipeline
+    LPRPipeline,
+    get_ocr_adapter
 )
 from lpr_core.validator import VietnamPlateValidator
 
 # Parse command line argument for vehicle test image or directory path
 parser = argparse.ArgumentParser(description="Run LPR Pipeline Benchmark on an Image or Directory of Images")
 parser.add_argument("input_path", nargs="?", default="test_images/car_test_3.jpg", help="Path to input image or directory (default: test_images/car_test_3.jpg)")
+parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to detector model (default: Models_yolo/best.onnx)")
+parser.add_argument("--ocr", default="paddleocr", help="OCR engine mode: paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet, cct_xs (default: paddleocr)")
 args = parser.parse_args()
 
 target_path = args.input_path
 if not os.path.exists(target_path):
     raise FileNotFoundError(f"Target path not found: {target_path}")
 
-# Initialize primary plate detector (fine-tuned YOLO11 model)
-model_path = "Models_yolo/best.pt" if os.path.exists("Models_yolo/best.pt") else "Models_yolo/yolov8n.pt"
+# Initialize primary plate detector
+model_path = args.model
+if not os.path.exists(model_path):
+    if model_path == "Models_yolo/best.onnx" and os.path.exists("Models_yolo/best.pt"):
+        print(f"Notice: 'Models_yolo/best.onnx' not found. Using 'Models_yolo/best.pt'.")
+        model_path = "Models_yolo/best.pt"
+    else:
+        raise FileNotFoundError(f"Detector model not found: {model_path}. Please place exported weights in Models_yolo/.")
+
 detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
-ocr = PaddleOCRAdapter(lang='en')
+ocr = get_ocr_adapter(args.ocr)
 pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
 
 # Determine whether input is a single file or a directory
@@ -62,7 +75,7 @@ for idx, img_path in enumerate(image_files):
     if summary['ocr_results']:
         raw_lines = [r['text'] for r in summary['ocr_results']]
         val_lines = [r['validated_text'] for r in summary['ocr_results']]
-        joined_text = "-".join(val_lines) if len(val_lines) > 1 else val_lines[0]
+        joined_text = "".join(val_lines)
         final_val = VietnamPlateValidator.clean_and_correct(joined_text)
         extracted_text = final_val['text']
         is_valid = final_val['is_valid']
@@ -81,10 +94,10 @@ for idx, img_path in enumerate(image_files):
 
 # Print aggregate summary report
 print("\nBenchmark Summary Report:")
-print(f"{'Image':<18} | {'Try Level':<10} | {'Resolution':<10} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
+print(f"{'Image':<22} | {'Try Escalation':<20} | {'Resolution':<10} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
 for r in results_list:
     valid_str = "YES" if r['valid'] else "NO"
-    print(f"{r['image']:<18} | {r['try_level']:<10} | {r['resolution']:<10} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
+    print(f"{r['image']:<22} | {r['try_level']:<20} | {r['resolution']:<10} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
 
 # Compute aggregate evaluation metrics
 total_imgs = len(results_list)
@@ -106,15 +119,16 @@ print(f"  Syntax Validation Pass Rate : {(valid_count / total_imgs) * 100:.1f}% 
 print(f"  1st-Try Resolution Rate     : {(first_try_count / total_imgs) * 100:.1f}% ({first_try_count}/{total_imgs})")
 print(f"  2nd-Try Escalation Rate     : {(second_try_count / total_imgs) * 100:.1f}% ({second_try_count}/{total_imgs})")
 if total_imgs > 1:
-    print(f"  Average Steady-State Det ms : {avg_steady_det:.1f} ms (cold start excluded)")
+    print(f"  Cold-Start First Run Det ms : {results_list[0]['det_ms']:.1f} ms")
+    print(f"  Average Steady-State Det ms : {avg_steady_det:.1f} ms (without cold start)")
     print(f"  Average Steady-State OCR ms : {avg_steady_ocr:.1f} ms")
 else:
     print(f"  Detection Latency           : {avg_steady_det:.1f} ms")
     print(f"  OCR Latency                 : {avg_steady_ocr:.1f} ms")
 
 
-# Dynamically record latest run into BENCHMARK_SUMMARY.md
-summary_md_path = "BENCHMARK_SUMMARY.md"
+# record latest run into BENCHMARK_SUMMARY.md
+summary_md_path = os.path.join(os.path.dirname(__file__), "BENCHMARK_SUMMARY.md")
 if os.path.exists(summary_md_path):
     timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(summary_md_path, "r", encoding="utf-8") as f:

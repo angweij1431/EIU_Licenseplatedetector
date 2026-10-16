@@ -2,35 +2,22 @@ import re
 
 # Vietnamese License Plate Syntax Validator and Error Corrector
 class VietnamPlateValidator:
-    # Official Vietnamese License Plate RegEx Syntax Patterns
-    # Automobiles (e.g. 30E-697.70 or 29M-6840): 2 digits + 1 letter + dash + 3-5 digits (optional .2 digits)
-    AUTO_PATTERN = re.compile(r'^[1-9][0-9][A-Z]-[0-9]{3,5}(\.[0-9]{2})?$')
+    # Official Vietnamese License Plate RegEx Syntax Patterns (Standardized Alphanumeric)
+    # Automobiles (e.g. 30E69770, 29M6840, 51G74372): 2 digits + 1 letter + 4-6 digits
+    AUTO_PATTERN = re.compile(r'^[1-9][0-9][A-Z][0-9]{4,6}$')
     
-    # Motorcycles (e.g. 63-B1 123.45 or 29-H1 999.99): 2 digits + dash + 1 letter + 1 digit + space + 3-5 digits
-    MOTO_PATTERN = re.compile(r'^[1-9][0-9]-[A-Z][0-9]\s?[0-9]{3,5}(\.[0-9]{2})?$')
+    # Motorcycles (e.g. 59D242069, 63H90394, 77C144470): 2 digits + 1 letter + 1 digit + 4-6 digits
+    MOTO_PATTERN = re.compile(r'^[1-9][0-9][A-Z][0-9][0-9]{4,6}$')
 
     @staticmethod
     def clean_and_correct(raw_text: str) -> dict:
         if not raw_text:
-            return {'text': '', 'raw_text': '', 'is_valid': False}
+            return {'text': '', 'raw_text': '', 'is_valid': False, 'format_similarity': 0.0, 'is_format_similar': False, 'mask': ''}
             
-        # Step 1: Strip unwanted symbols and convert to uppercase
-        cleaned = re.sub(r'[^A-Z0-9\.\-]', '', raw_text.upper())
+        # Step 1: Strip all non-alphanumeric characters (drop hyphens, dots, spaces, rivets)
+        cleaned = re.sub(r'[^A-Z0-9]', '', raw_text.upper())
         
-        # Step 2: Strip leading/trailing dots and dashes (caused by mounting screw rivets)
-        cleaned = re.sub(r'^[.\-]+|[.\-]+$', '', cleaned)
-        
-        # Step 3: Remove internal noise dots (e.g. '29M.-6840' -> '29M-6840')
-        # Only preserve dot if it is a legitimate Vietnamese decimal separator (e.g. .70 in 697.70)
-        parts = cleaned.split('-')
-        cleaned_parts = []
-        for p in parts:
-            # If dot is at the end or start of a subpart, strip it
-            p_clean = re.sub(r'^[.\-]+|[.\-]+$', '', p)
-            cleaned_parts.append(p_clean)
-        cleaned = "-".join(cleaned_parts)
-        
-        # Step 4: Validate directly against official Vietnamese syntax patterns (No character replacement)
+        # Step 2: Validate against standardized alphanumeric Vietnamese syntax patterns
         is_valid = bool(
             VietnamPlateValidator.AUTO_PATTERN.match(cleaned) or 
             VietnamPlateValidator.MOTO_PATTERN.match(cleaned)
@@ -85,7 +72,9 @@ class VietnamPlateValidator:
         min_mismatches = 99
         
         # Standard Vietnamese plate templates (without symbols)
-        templates = ["DDLDDDD", "DDLDDDDD", "DDLDDDDDD"]
+        # Automobile: DDLDDDD, DDLDDDDD, DDLDDDDDD (e.g. 29M6840, 30A69770, 51G74372)
+        # Motorcycle: DDLDDDDDD (e.g. 59D242069, 63H90394)
+        templates = ["DDLDDDD", "DDLDDDDD", "DDLDDDDDD", "DDLDDDDDDD"]
         for t in templates:
             dist = VietnamPlateValidator.levenshtein_distance(mask, t)
             max_len = max(len(mask), len(t))
