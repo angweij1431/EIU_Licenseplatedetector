@@ -9,6 +9,7 @@ env/
 # *.pt
 *.onnx
 *.engine
+*.pth
 # Models_yolo/
 
 # Python Cache & Outputs

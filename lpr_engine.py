@@ -137,26 +137,54 @@ class PaddleOCRAdapter(BaseOCR):
         logging.getLogger("ppocr").setLevel(logging.ERROR)
         
         import torch
-        from paddleocr import PaddleOCR
         self.mode = mode.lower()
-        print(f"Initializing PaddleOCR (language: {lang}, mode: {self.mode})")
-        self.ocr_model = PaddleOCR(
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False,
-            enable_mkldnn=False,
-            lang=lang
-        )
+        if self.mode in ['no_dbnet', 'rec_only', 'paddle_no_dbnet']:
+            from paddleocr import TextRecognition
+            print(f"Initializing PaddleOCR (language: {lang}, mode: {self.mode} [Recognition Only / Zero DBNet])")
+            self.rec_model = TextRecognition()
+        else:
+            from paddleocr import PaddleOCR
+            print(f"Initializing PaddleOCR (language: {lang}, mode: {self.mode})")
+            self.ocr_model = PaddleOCR(
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+                enable_mkldnn=False,
+                lang=lang
+            )
         
     # Performs text recognition on a cropped plate image
     def recognize(self, image_crop: np.ndarray):
         if image_crop is None or image_crop.size == 0:
             raise ValueError("Input image crop to PaddleOCR is empty")
             
-        if self.mode in ['split_lines', 'split', 'fast_split', 'geometric']:
+        if self.mode in ['no_dbnet', 'rec_only', 'paddle_no_dbnet']:
+            return self._recognize_no_dbnet(image_crop)
+        elif self.mode in ['split_lines', 'split', 'fast_split', 'geometric']:
             return self._recognize_split_lines(image_crop)
         else:
             return self._recognize_full(image_crop)
+
+    # Recognition-only pipeline bypassing DBNet text detection
+    def _recognize_no_dbnet(self, image_crop: np.ndarray):
+        h, w = image_crop.shape[:2]
+        aspect_ratio = w / float(h) if h > 0 else 1.0
+        
+        # Slicing logic: square 2-line plates (<= 2.2) vs long 1-line plates
+        slices = [image_crop[0:int(h * 0.55), :], image_crop[int(h * 0.45):h, :]] if aspect_ratio <= 2.2 else [image_crop]
+        
+        ocr_entries = []
+        for s in slices:
+            if s.size == 0:
+                continue
+            predict_res = list(self.rec_model.predict(s))
+            for item in predict_res:
+                if isinstance(item, dict):
+                    txt = item.get('rec_text', '')
+                    score = float(item.get('rec_score', 0.0))
+                    if txt:
+                        ocr_entries.append({'text': txt, 'confidence': score})
+        return ocr_entries
 
     # Standard full neural detection + recognition pipeline
     def _recognize_full(self, image_crop: np.ndarray):
@@ -264,19 +292,35 @@ class CRNNAdapter(BaseOCR):
             tensor = normalized[np.newaxis, np.newaxis, ...]
             
             logits = self.session.run(None, {self.input_name: tensor})[0]
-            preds = np.argmax(logits, axis=2)[0] if len(logits.shape) == 3 else np.argmax(logits, axis=1)
-            
-            # CTC greedy collapse
-            decoded = []
-            prev = -1
-            for idx in preds:
-                if idx != 0 and idx != prev:
-                    if idx < len(self.chars):
-                        decoded.append(self.chars[idx])
-                prev = idx
-            text = "".join(decoded)
+            if len(logits.shape) == 3:
+                logits_2d = logits[0] # (T, C)
+                exp_logits = np.exp(logits_2d - np.max(logits_2d, axis=-1, keepdims=True))
+                probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+                preds = np.argmax(probs, axis=-1)
+                char_confs = []
+                decoded = []
+                prev = -1
+                for i, idx in enumerate(preds):
+                    if idx != 0 and idx != prev:
+                        if idx < len(self.chars):
+                            decoded.append(self.chars[idx])
+                            char_confs.append(float(probs[i, idx]))
+                    prev = idx
+                text = "".join(decoded)
+                mean_conf = float(np.mean(char_confs)) if char_confs else 0.0
+            else:
+                preds = np.argmax(logits, axis=1)
+                decoded = []
+                prev = -1
+                for idx in preds:
+                    if idx != 0 and idx != prev:
+                        if idx < len(self.chars):
+                            decoded.append(self.chars[idx])
+                    prev = idx
+                text = "".join(decoded)
+                mean_conf = 0.0
             if text:
-                results.append({'text': text, 'confidence': 0.90})
+                results.append({'text': text, 'confidence': round(mean_conf, 4)})
         return results if results else [{'text': '', 'confidence': 0.0}]
 
 
@@ -289,21 +333,43 @@ class LPRNetAdapter(BaseOCR):
         import onnxruntime as ort
         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
-        self.chars = list("0123456789ABCDEFGHKLMNPRSTUVXYZ-") # required for lprnet
+        self.chars = ['_'] + list("0123456789ABCDEFGHKLMNPRSTUVXYZ-") # CTC blank token at index 0 followed by 32 characters
 
     def recognize(self, image_crop: np.ndarray):
-        resized = cv2.resize(image_crop, (94, 24)).astype(np.float32)
-        normalized = (resized - 127.5) * 0.0078125
-        tensor = np.transpose(normalized, (2, 0, 1))[np.newaxis, ...]
-        logits = self.session.run(None, {self.input_name: tensor})[0]
-        best_path = np.argmax(logits, axis=1)[0]
-        decoded = []
-        for i, idx in enumerate(best_path):
-            if idx != 0 and (i == 0 or idx != best_path[i - 1]):
-                if idx < len(self.chars):
-                    decoded.append(self.chars[idx])
-        text = "".join(decoded)
-        return [{'text': text, 'confidence': 0.95}]
+        if image_crop is None or image_crop.size == 0:
+            raise ValueError("Input image crop to LPRNet is empty")
+
+        h, w = image_crop.shape[:2]
+        aspect_ratio = w / float(h) if h > 0 else 1.0
+        slices = [image_crop] if aspect_ratio > 2.2 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
+
+        results = []
+        for s in slices:
+            if s.size == 0:
+                continue
+            resized = cv2.resize(s, (94, 24)).astype(np.float32)
+            normalized = (resized - 127.5) * 0.0078125
+            tensor = np.transpose(normalized, (2, 0, 1))[np.newaxis, ...]
+            logits = self.session.run(None, {self.input_name: tensor})[0]
+            logits_2d = logits[0] # (num_classes, seq_len)
+
+            # Compute numerically stable softmax probabilities along class dimension
+            exp_logits = np.exp(logits_2d - np.max(logits_2d, axis=0, keepdims=True))
+            probs = exp_logits / np.sum(exp_logits, axis=0, keepdims=True)
+
+            best_path = np.argmax(probs, axis=0)
+            decoded = []
+            char_confs = []
+            for i, idx in enumerate(best_path):
+                if idx != 0 and (i == 0 or idx != best_path[i - 1]):
+                    if idx < len(self.chars):
+                        decoded.append(self.chars[idx])
+                        char_confs.append(float(probs[idx, i]))
+            text = "".join(decoded)
+            if text:
+                mean_conf = float(np.mean(char_confs)) if char_confs else 0.0
+                results.append({'text': text, 'confidence': round(mean_conf, 4)})
+        return results if results else [{'text': '', 'confidence': 0.0}]
 
 
 # CCT-XS compact convolutional transformer adapter
@@ -333,6 +399,8 @@ def get_ocr_adapter(name: str = "paddleocr", **kwargs) -> BaseOCR:
     name_clean = name.lower().strip()
     if name_clean in ["paddleocr", "paddle", "paddle_full", "full"]:
         return PaddleOCRAdapter(mode="full", **kwargs)
+    elif name_clean in ["paddle_no_dbnet", "no_dbnet", "rec_only"]:
+        return PaddleOCRAdapter(mode="no_dbnet", **kwargs)
     elif name_clean in ["paddle_split", "split_lines", "split", "paddle_fast", "fast_split", "paddle_geometric", "geometric"]:
         return PaddleOCRAdapter(mode="split_lines", **kwargs)
     elif name_clean in ["crnn", "crnn_onnx"]:
@@ -342,7 +410,7 @@ def get_ocr_adapter(name: str = "paddleocr", **kwargs) -> BaseOCR:
     elif name_clean in ["cct_xs", "cct"]:
         return CCTXSRecognizerAdapter(**kwargs)
     else:
-        raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: paddleocr, paddle_split, crnn, lprnet, cct_xs")
+        raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet, cct_xs")
 
 
 # Unified License Plate Recognition pipeline
