@@ -235,29 +235,49 @@ class PaddleOCRAdapter(BaseOCR):
         return ocr_entries
 
 
-# EasyOCR model adapter
-class EasyOCRAdapter(BaseOCR):
-    # Initializes EasyOCR reader
-    def __init__(self, lang_list: list = ['en'], gpu: bool = False):
-        import easyocr
-        print(f"Initializing EasyOCR (languages: {lang_list}, gpu: {gpu})")
-        self.reader = easyocr.Reader(lang_list, gpu=gpu)
-        
-    # Performs text recognition on image crop
+# CRNN model adapter (Convolutional Recurrent Neural Network for scene and plate text)
+class CRNNAdapter(BaseOCR):
+    def __init__(self, model_path: str = "Models_ocr/crnn.onnx", 
+                 chars: str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-"):
+        self.model_path = model_path
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"CRNN model weights not found: {model_path}. Please place weights in Models_ocr/.")
+        import onnxruntime as ort
+        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+        self.input_name = self.session.get_inputs()[0].name
+        self.chars = list(chars)
+
     def recognize(self, image_crop: np.ndarray):
         if image_crop is None or image_crop.size == 0:
-            raise ValueError("Input image crop to EasyOCR is empty")
+            raise ValueError("Input image crop to CRNN is empty")
+        
+        # Standard CRNN input dimensions: 100x32 grayscale or RGB
+        h, w = image_crop.shape[:2]
+        aspect_ratio = w / float(h) if h > 0 else 1.0
+        slices = [image_crop] if aspect_ratio > 2.2 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
+        
+        results = []
+        for s in slices:
+            gray = cv2.cvtColor(s, cv2.COLOR_BGR2GRAY) if len(s.shape) == 3 else s
+            resized = cv2.resize(gray, (100, 32)).astype(np.float32)
+            normalized = (resized / 127.5) - 1.0
+            tensor = normalized[np.newaxis, np.newaxis, ...]
             
-        results = self.reader.readtext(image_crop)
-        ocr_entries = []
-        for res in results:
-            # Unpack text and confidence directly without storing unused bbox
-            text, conf = res[1], float(res[2])
-            ocr_entries.append({
-                'text': text,
-                'confidence': conf
-            })
-        return ocr_entries
+            logits = self.session.run(None, {self.input_name: tensor})[0]
+            preds = np.argmax(logits, axis=2)[0] if len(logits.shape) == 3 else np.argmax(logits, axis=1)
+            
+            # CTC greedy collapse
+            decoded = []
+            prev = -1
+            for idx in preds:
+                if idx != 0 and idx != prev:
+                    if idx < len(self.chars):
+                        decoded.append(self.chars[idx])
+                prev = idx
+            text = "".join(decoded)
+            if text:
+                results.append({'text': text, 'confidence': 0.90})
+        return results if results else [{'text': '', 'confidence': 0.0}]
 
 
 # LPRNet model adapter (lightweight spatial CNN for license plates)
@@ -315,14 +335,14 @@ def get_ocr_adapter(name: str = "paddleocr", **kwargs) -> BaseOCR:
         return PaddleOCRAdapter(mode="full", **kwargs)
     elif name_clean in ["paddle_split", "split_lines", "split", "paddle_fast", "fast_split", "paddle_geometric", "geometric"]:
         return PaddleOCRAdapter(mode="split_lines", **kwargs)
-    elif name_clean in ["easyocr", "easy"]:
-        return EasyOCRAdapter(**kwargs)
+    elif name_clean in ["crnn", "crnn_onnx"]:
+        return CRNNAdapter(**kwargs)
     elif name_clean in ["lprnet"]:
         return LPRNetAdapter(**kwargs)
     elif name_clean in ["cct_xs", "cct"]:
         return CCTXSRecognizerAdapter(**kwargs)
     else:
-        raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: paddleocr, paddle_split, easyocr, lprnet, cct_xs")
+        raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: paddleocr, paddle_split, crnn, lprnet, cct_xs")
 
 
 # Unified License Plate Recognition pipeline

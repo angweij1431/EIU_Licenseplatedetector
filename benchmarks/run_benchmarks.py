@@ -21,7 +21,7 @@ from lpr_core.validator import VietnamPlateValidator
 parser = argparse.ArgumentParser(description="Run LPR Pipeline Benchmark on an Image or Directory of Images")
 parser.add_argument("input_path", nargs="?", default="test_images/car_test_3.jpg", help="Path to input image or directory (default: test_images/car_test_3.jpg)")
 parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to detector model (default: Models_yolo/best.onnx)")
-parser.add_argument("--ocr", default="paddleocr", help="OCR engine mode: paddleocr, paddle_geometric, easyocr (default: paddleocr)")
+parser.add_argument("--ocr", default="paddleocr", help="OCR engine mode: paddleocr, paddle_split, crnn, lprnet, cct_xs (default: paddleocr)")
 args = parser.parse_args()
 
 target_path = args.input_path

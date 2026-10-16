@@ -25,7 +25,7 @@ def main():
     # Discover target .onnx models in Models_yolo
     onnx_files = sorted(glob.glob(os.path.join(MODELS_DIR, "*.onnx")))
     # Exclude best.onnx and best_11s.onnx as requested
-    onnx_files = [f for f in onnx_files if os.path.basename(f) not in ["best.onnx", "best_11s.onnx"]]
+    # onnx_files = [f for f in onnx_files if os.path.basename(f) not in ["best_11.onnx"]]
 
     if not onnx_files:
         print("No eligible .onnx models found in Models_yolo.")
@@ -119,6 +119,13 @@ def main():
         try1_count = sum(1 for r in current_model_rows if r['gate_status'] == "Try 1")
         try2_count = sum(1 for r in current_model_rows if r['gate_status'] == "Try 2")
         closed_count = sum(1 for r in current_model_rows if r['gate_status'] == "Gate Closed")
+
+        # Compute average confidences across detected plates and non-zero OCR outputs
+        detected_confs = [r['det_conf'] for r in current_model_rows if r['plate_found']]
+        avg_det_conf = (sum(detected_confs) / len(detected_confs)) if detected_confs else 0.0
+
+        valid_ocr_confs = [r['ocr_conf'] for r in current_model_rows if r['ocr_conf'] > 0.0]
+        avg_ocr_conf = (sum(valid_ocr_confs) / len(valid_ocr_confs)) if valid_ocr_confs else 0.0
 
         # Segment cold-start (image 0) from steady-state (images 1..n)
         cold_det_ms = current_model_rows[0]['det_ms']
