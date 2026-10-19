@@ -91,24 +91,24 @@ We tested 3 different training approaches for the YOLO models:
 ### E. Test Results Summary across all 16 Images
 *(All visual output images are stored in `Outputs/balanced_output/`).*
 
-| Image | Category | Ground Truth | Detected Output | Gate Status |
-| :--- | :--- | :---: | :---: | :---: |
-| `bike_test_9.jpg` | Motorbike | `59-D2 420.69` | `59D242069` | **GATE_OPEN** |
-| `bike_test_10.jpg` | Motorbike | `43-D1 999.99` | `43D199999` | **GATE_OPEN** |
-| `bike_test_11.jpg` | Motorbike | `29-H1 339.79` | `29H133979` | **GATE_OPEN** |
-| `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN** |
-| `car_test_2.jpg` | Car (Custom font) | `30E-697.70` | `30169770` | **GATE_CLOSED (Audit Flag)** |
-| `car_test_3.jpg` | Car (Angled / Inspection sign) | `29M-6840` | `2TRUNGT` | **GATE_CLOSED (Invalid Syntax)** |
-| `car_test_4.jpg` | Car (Clean rear) | `51G-743.72` | `51G74372` | **GATE_OPEN** |
-| `car_test_5.jpg` | Car (Clean front) | `51G-777.77` | `51G77777` | **GATE_OPEN** |
-| `car_test_6.jpg` | Truck | `63H-903.94` | `63H90394` | **GATE_OPEN** |
-| `car_test_7.jpg` | Obscured Plate | Obscured | `NONE` | **GATE_CLOSED (Safe Rejection)** |
-| `car_test_8.jpg` | Heavy Motion Blur | Blurred | `NONE` | **GATE_CLOSED (Safe Rejection)** |
-| `neg_sample_test_1.jpg` | Pedestrian Walkway | None | `NONE` | **GATE_CLOSED (Safe Rejection)** |
-| `neg_sample_test_2.jpg` | Road Pavement | None | `NONE` | **GATE_CLOSED (Safe Rejection)** |
-| `neg_sample_test_3.jpg` | Bicycle Frame | None | `NONE` | **GATE_CLOSED (Safe Rejection)** |
-| `neg_sample_test_4.jpg` | Road Signage | None | `NONE` | **GATE_CLOSED (Safe Rejection)** |
-| `neg_sample_test_5.jpg` | Campus Gate Barrier | None | `NONE` | **GATE_CLOSED (Safe Rejection)** |
+| Image File | Category | Ground Truth | Detected Output | Gate Status | YOLO11n Det Speed |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| `bike_test_9.jpg` | Motorbike | `59-D2 420.69` | `59D242069` | **GATE_OPEN** | **61.0 ms** |
+| `bike_test_10.jpg` | Motorbike | `43-D1 999.99` | `43D199999` | **GATE_OPEN** | 3,227.7 ms (Cold) |
+| `bike_test_11.jpg` | Motorbike | `29-H1 339.79` | `29H133979` | **GATE_OPEN** | **73.4 ms** |
+| `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN** | **50.0 ms** |
+| `car_test_2.jpg` | Car (Custom font) | `30E-697.70` | `30169770` | **GATE_CLOSED (Audit Flag)** | **148.8 ms** |
+| `car_test_3.jpg` | Car (Angled / Inspection sign) | `29M-6840` | `2TRUNGT` | **GATE_CLOSED (Invalid Syntax)** | **125.0 ms** |
+| `car_test_4.jpg` | Car (Clean rear) | `51G-743.72` | `51G74372` | **GATE_OPEN** | **62.2 ms** |
+| `car_test_5.jpg` | Car (Clean front) | `51G-777.77` | `51G77777` | **GATE_OPEN** | **58.0 ms** |
+| `car_test_6.jpg` | Truck | `63H-903.94` | `63H90394` | **GATE_OPEN** | **75.4 ms** |
+| `car_test_7.jpg` | Obscured Plate | Obscured | `NONE` | **GATE_CLOSED (Safe Rejection)** | **126.8 ms** |
+| `car_test_8.jpg` | Heavy Motion Blur | Blurred | `NONE` | **GATE_CLOSED (Safe Rejection)** | **121.5 ms** |
+| `neg_sample_test_1.jpg` | Pedestrian Walkway | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **123.7 ms** |
+| `neg_sample_test_2.jpg` | Road Pavement | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **135.0 ms** |
+| `neg_sample_test_3.jpg` | Bicycle Frame | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **121.7 ms** |
+| `neg_sample_test_4.jpg` | Road Signage | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **148.4 ms** |
+| `neg_sample_test_5.jpg` | Campus Gate Barrier | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **132.4 ms** |
 
 ---
 
@@ -131,6 +131,19 @@ We tested 3 different training approaches for the YOLO models:
 
 * **Model File Size**: **2.05 MB** (`Models_ocr/lprnet.onnx`).
 * **Inference Speed**: **~30 to 62 ms** on CPU (over 20x faster than PaddleOCR).
+
+### Recognition Speed Comparison on Real Test Images
+*(Measured directly on Intel Core i7-1260P CPU during benchmark runs)*
+
+| Image File | Plate Category | PaddleOCR (PP-OCRv6) | LPRNet Speed | Real-World Speedup |
+| :--- | :--- | :---: | :---: | :---: |
+| `car_test_5.jpg` | Clean Single-Line Car (`51G77777`) | 1,322.6 ms | **62.4 ms** | **21.2x faster** |
+| `car_test_2.jpg` | Front Car Plate (`30E69770`) | 6,323.4 ms | **38.7 ms** | **Sub-40 ms speed** |
+| `car_test_4.jpg` | Rear Car Plate (`51G74372`) | 1,204.9 ms | **121.8 ms** | **9.9x faster** |
+| `bike_test_11.jpg`| Dual-Row Motorbike (`29H133979`) | 1,956.0 ms | **210.0 ms** | **9.3x faster** |
+| `bike_test_9.jpg` | Dual-Row Motorbike (`59D242069`) | 2,584.9 ms | **240.3 ms** | **10.7x faster** |
+| **Pure Tensor Pass** | *(Isolated single-crop test)* | **401.6 ms** | **29.7 ms** | **13.5x faster** |
+
 * **Current Performance Level**:
   * On clean, single-line car plates, LPRNet is already working accurately. For example, on `car_test_5.jpg`, it recognized `51G77777` with 100% accuracy in **62.4 ms**.
 * **Current Status (Work in Progress)**:
