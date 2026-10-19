@@ -91,24 +91,27 @@ We tested 3 different training approaches for the YOLO models:
 ### E. Test Results Summary across all 16 Images
 *(All visual output images are stored in `Outputs/balanced_output/`).*
 
-| Image File | Category | Ground Truth | Detected Output | Gate Status | YOLO11n Det Speed |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| `bike_test_9.jpg` | Motorbike | `59-D2 420.69` | `59D242069` | **GATE_OPEN** | **61.0 ms** |
-| `bike_test_10.jpg` | Motorbike | `43-D1 999.99` | `43D199999` | **GATE_OPEN** | 3,227.7 ms (Cold) |
-| `bike_test_11.jpg` | Motorbike | `29-H1 339.79` | `29H133979` | **GATE_OPEN** | **73.4 ms** |
-| `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN** | **50.0 ms** |
-| `car_test_2.jpg` | Car (Custom font) | `30E-697.70` | `30169770` | **GATE_CLOSED (Audit Flag)** | **148.8 ms** |
-| `car_test_3.jpg` | Car (Angled / Inspection sign) | `29M-6840` | `2TRUNGT` | **GATE_CLOSED (Invalid Syntax)** | **125.0 ms** |
-| `car_test_4.jpg` | Car (Clean rear) | `51G-743.72` | `51G74372` | **GATE_OPEN** | **62.2 ms** |
-| `car_test_5.jpg` | Car (Clean front) | `51G-777.77` | `51G77777` | **GATE_OPEN** | **58.0 ms** |
-| `car_test_6.jpg` | Truck | `63H-903.94` | `63H90394` | **GATE_OPEN** | **75.4 ms** |
-| `car_test_7.jpg` | Obscured Plate | Obscured | `NONE` | **GATE_CLOSED (Safe Rejection)** | **126.8 ms** |
-| `car_test_8.jpg` | Heavy Motion Blur | Blurred | `NONE` | **GATE_CLOSED (Safe Rejection)** | **121.5 ms** |
-| `neg_sample_test_1.jpg` | Pedestrian Walkway | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **123.7 ms** |
-| `neg_sample_test_2.jpg` | Road Pavement | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **135.0 ms** |
-| `neg_sample_test_3.jpg` | Bicycle Frame | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **121.7 ms** |
-| `neg_sample_test_4.jpg` | Road Signage | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **148.4 ms** |
-| `neg_sample_test_5.jpg` | Campus Gate Barrier | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **132.4 ms** |
+| Image File | Category | Ground Truth | Detected Output | Gate Status | YOLO11n Det Speed | PaddleOCR Speed |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| `bike_test_9.jpg` | Motorbike | `59-D2 420.69` | `59D242069` | **GATE_OPEN** | **61.0 ms** | **2,235.7 ms** |
+| `bike_test_10.jpg` | Motorbike | `43-D1 999.99` | `43D199999` | **GATE_OPEN** | 3,227.7 ms (Cold) | **2,420.3 ms** |
+| `bike_test_11.jpg` | Motorbike | `29-H1 339.79` | `29H133979` | **GATE_OPEN** | **73.4 ms** | **1,956.0 ms** |
+| `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN** | **50.0 ms** | **2,841.2 ms** (Try 2) |
+| `car_test_2.jpg` | Car (Custom font) | `30E-697.70` | `30169770` | **GATE_CLOSED (Audit Flag)** | **148.8 ms** | **6,114.4 ms** (Audit) |
+| `car_test_3.jpg` | Car (Angled / Inspection sign) | `29M-6840` | `2TRUNGT` | **GATE_CLOSED (Invalid Syntax)** | **125.0 ms** | **7,961.3 ms** (Audit) |
+| `car_test_4.jpg` | Car (Clean rear) | `51G-743.72` | `51G74372` | **GATE_OPEN** | **62.2 ms** | **1,204.9 ms** |
+| `car_test_5.jpg` | Car (Clean front) | `51G-777.77` | `51G77777` | **GATE_OPEN** | **58.0 ms** | **1,322.6 ms** |
+| `car_test_6.jpg` | Truck | `63H-903.94` | `63H90394` | **GATE_OPEN** | **75.4 ms** | **4,013.4 ms** (Try 2) |
+| `car_test_7.jpg` | Obscured Plate | Obscured | `NONE` | **GATE_CLOSED (Safe Rejection)** | **126.8 ms** | **0.0 ms** (Skipped) |
+| `car_test_8.jpg` | Heavy Motion Blur | Blurred | `NONE` | **GATE_CLOSED (Safe Rejection)** | **121.5 ms** | **0.0 ms** (Skipped) |
+| `neg_sample_test_1.jpg` | Pedestrian Walkway | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **123.7 ms** | **0.0 ms** (Skipped) |
+| `neg_sample_test_2.jpg` | Road Pavement | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **135.0 ms** | **0.0 ms** (Skipped) |
+| `neg_sample_test_3.jpg` | Bicycle Frame | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **121.7 ms** | **4,735.5 ms** (Discard) |
+| `neg_sample_test_4.jpg` | Road Signage | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **148.4 ms** | **6,140.2 ms** (Discard) |
+| `neg_sample_test_5.jpg` | Campus Gate Barrier | None | `NONE` | **GATE_CLOSED (Safe Rejection)** | **132.4 ms** | **0.0 ms** (Skipped) |
+
+* **Why OCR is 0.0 ms on negatives/blurs**: When YOLO finds 0 boxes, the pipeline skips OCR completely to save CPU power.
+* **Why OCR takes longer on hard plates**: On blurry or angled plates, the pipeline runs multi-pass enhancement (stroke repair or deep zoom) to attempt text recovery, increasing the reading time.
 
 ---
 
