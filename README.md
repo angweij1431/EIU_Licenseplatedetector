@@ -97,7 +97,7 @@ Tested 20 different ONNX detector models across three training datasets:
 | `balanced_best_yolov10n.onnx` | Balanced 1:1 (25 eps) | 114.9 ms | 10/16 (62.5%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
 | `best_yolo8.onnx` | Baseline (50 eps) | 170.3 ms | 9/16 (56.2%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
 
-*(Note: 43.8% (7/16) gate open rate represents 100% of all eligible valid vehicle plates in the suite; 5 are intentional negative background samples and 4 are blurred/stress plates. The 4/4 motorcycle metric is evaluated on the 4 dual-row test images; see MINI_REPORT_LPR_RESEARCH.md Section 5.D for failure mode analysis on glare and cascaded gatekeeping).*
+*(Note: 43.8% (7/16) gate open rate represents 100% of all eligible valid vehicle plates in the suite; 5 are intentional negative background samples and 4 are blurred/stress plates. The 4/4 motorcycle metric is evaluated on the 4 dual-row test images; environmental glare or dirt can still cause detectors to miss plates in real-world conditions).*
 
 ### Suggested Model: YOLO11n (Balanced)
 

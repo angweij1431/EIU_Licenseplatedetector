@@ -52,3 +52,9 @@ Outputs/*.png
 # Local IDE settings
 .vscode/
 .idea/
+
+# Internal Research Documentation & Verification Scripts
+MINI_REPORT_LPR_RESEARCH.md
+benchmarks/verify_latency.py
+*HANDOFF*
+TEMP_HANDOFF*
