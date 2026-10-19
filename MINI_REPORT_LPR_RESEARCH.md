@@ -106,10 +106,15 @@ $$\text{Total System Latency} \approx 1280.6\text{ ms}$$
 * **RFID Card Reader Polling**: $12.0\text{ ms} \quad (0.9\%)$
 
 ### B. Computational Hardware Specifications
-* **Runtime Engine**: ONNX Runtime 1.31.0 (`CPUExecutionProvider`)
-* **Thread Configuration**: Single-thread bound (deterministic real-time response)
-* **Cold-Start Penalty**: 3,227.7 ms (first image session allocation, graph initialization)
+* **Test Machine**: Standard Laptop / Edge Host Evaluation Environment
+* **Processor (CPU)**: 12th Gen Intel(R) Core(TM) i7-1260P (12 Cores: 4 Performance + 8 Efficient, 16 Threads, up to 4.70 GHz)
+* **System Memory (RAM)**: 16.0 GB DDR4/LPDDR5
+* **Operating System**: Microsoft Windows 11 (x86-64)
+* **Inference Engine**: ONNX Runtime 1.31.0 (`CPUExecutionProvider`)
+* **Thread Execution**: Bound to single-thread / default CPU execution provider (no external discrete GPU / CUDA required)
+* **Cold-Start Latency**: 3,227.7 ms (first image session allocation, graph initialization)
 * **Steady-State Response**: 104.2 ms detector / 2,775 ms total with PaddleOCR
+* **LPRNet Edge Latency**: 62.4 ms on single-pass car plate (`car_test_5.jpg`)
 * **Projected LPRNet Steady-State**: 104.2 ms detector + 25 ms LPRNet $\rightarrow$ **~130 ms end-to-end barrier latency**.
 
 ---
