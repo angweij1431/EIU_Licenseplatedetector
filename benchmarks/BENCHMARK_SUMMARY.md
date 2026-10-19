@@ -448,3 +448,8 @@ updated benchmark tests for 15 oct with new test images incl neg samples and bic
 | 2026-10-19 11:22:43 | `neg_sample_test_3.jpg` | 3rd try | 1024px | 1 | `` | NO | 369.1 | 137.8 |
 | 2026-10-19 11:22:43 | `neg_sample_test_4.jpg` | 3rd try | 1024px | 1 | `7` | NO | 466.0 | 134.6 |
 | 2026-10-19 11:22:43 | `neg_sample_test_5.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 420.1 | 0.0 |
+| 2026-10-19 14:04:41 | `car_test_5.jpg` | 3rd try | 1024px | 1 | `` | NO | 7202.7 | 333.5 |
+| 2026-10-19 14:04:59 | `car_test_5.jpg` | 1st try | 640px | 1 | `51G77777` | YES | 2475.2 | 34.0 |
+| 2026-10-19 14:05:34 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `1G7437` | NO | 3031.4 | 166.4 |
+| 2026-10-19 14:05:58 | `bike_test_11.jpg` | 3rd try | 1024px | 1 | `1F993397` | NO | 3165.8 | 346.1 |
+| 2026-10-19 14:30:15 | `car_test_5.jpg` | 1st try | 640px | 1 | `51G77777` | YES | 3562.1 | 77.0 |

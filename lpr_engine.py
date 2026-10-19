@@ -487,8 +487,8 @@ class LPRPipeline:
             x1, y1, x2, y2 = map(int, d['box'])
             h, w, _ = img.shape
             if is_lprnet:
-                pad_w = max(2, int((x2 - x1) * 0.02))
-                pad_h = max(2, int((y2 - y1) * 0.02))
+                pad_w = max(6, int((x2 - x1) * 0.08))
+                pad_h = max(4, int((y2 - y1) * 0.06))
             else:
                 pad_w = max(20, int((x2 - x1) * padding_percent))
                 pad_h = max(15, int((y2 - y1) * padding_percent))

@@ -257,6 +257,14 @@ class RealVietnameseDataset(Dataset):
                     ksize = random.choice([3, 5])
                     img = cv2.GaussianBlur(img, (ksize, ksize), 0)
 
+                # 6. Random Stroke Thickness Variation (prevents stroke confusion like 6 vs F, 2 vs 5)
+                if random.random() < 0.30:
+                    kernel = np.ones((2, 2), np.uint8)
+                    if random.random() < 0.5:
+                        img = cv2.erode(img, kernel, iterations=1)
+                    else:
+                        img = cv2.dilate(img, kernel, iterations=1)
+
             # Uniform resize to single-row LPRNet input dimension
             img = cv2.resize(img, (94, 24))
 
@@ -324,7 +332,7 @@ model = LPRNet(class_num=NUM_CLASSES, dropout_rate=0.3).to(device)
 criterion = nn.CTCLoss(blank=0, zero_infinity=True)
 optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
-EPOCHS = 50
+EPOCHS = 75
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-5)
 best_loss = float("inf")
 
