@@ -65,30 +65,33 @@ All candidate models were evaluated across the 16-image empirical benchmark suit
 
 This table evaluates **Step 1: Plate Detection** across fine-tuned YOLO architectures. The speed column measures strictly the time the YOLO detector needs to find and crop the license plate from the camera snapshot. Character recognition (OCR) is measured separately in Section 4.
 
-| ONNX Model | Training Strategy | Model Size | Detector Speed (Finding Plate) | Plate Recall | Motorbike Recall | Gate Open Rate | False Alarms |
+| ONNX Model | Training Strategy | Model Size | Detector Speed (Finding Plate) | Plate Recall | Motorbike Test Set (N=4) | Gate Open Rate | False Alarms |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`balanced_best_yolo11n.onnx`** | **Balanced 1:1 (25 eps)** | **5.5 MB** | **104.2 ms** | **11/16 (68.8%)** | **4/4 (100%)** | **7/16 (43.8%)** | **0% (0/5)** |
-| `balanced_best_yolo11s.onnx` | Balanced 1:1 (25 eps) | 19.2 MB | 232.4 ms | 11/16 (68.8%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `balanced_best_yolo26n.onnx` | Balanced 1:1 (25 eps) | 5.8 MB | 114.8 ms | 8/16 (50.0%) | 4/4 (100%) | 6/16 (37.5%) | 0% (0/5) |
-| `balanced_best_yolov10n.onnx` | Balanced 1:1 (25 eps) | 5.6 MB | 114.9 ms | 10/16 (62.5%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `balanced_best_yolov10s.onnx` | Balanced 1:1 (25 eps) | 16.5 MB | 231.9 ms | 12/16 (75.0%) | 4/4 (100%) | 6/16 (37.5%) | 0% (0/5) |
-| `best.onnx` | Baseline (50 eps) | 5.5 MB | 132.7 ms | 10/16 (62.5%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `best_yolo10n.onnx` | Baseline (15 eps) | 5.6 MB | 117.4 ms | 10/16 (62.5%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `best_yolo10s.onnx` | Baseline (15 eps) | 16.5 MB | 265.8 ms | 12/16 (75.0%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `best_yolo11n.onnx` | Baseline (15 eps) | 5.5 MB | 136.0 ms | 11/16 (68.8%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `best_yolo11s.onnx` | Baseline (15 eps) | 19.2 MB | 266.9 ms | 11/16 (68.8%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `best_yolo26n.onnx` | Baseline (15 eps) | 5.8 MB | 105.3 ms | 9/16 (56.2%) | 4/4 (100%) | 6/16 (37.5%) | 0% (0/5) |
-| `best_yolo26s.onnx` | Baseline (15 eps) | 19.8 MB | 249.4 ms | 11/16 (68.8%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `best_yolo8.onnx` | Baseline (50 eps) | 6.2 MB | 170.3 ms | 9/16 (56.2%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `refined_best_yolo11n.onnx` | Refined (15 eps) | 5.5 MB | 134.2 ms | 9/16 (56.2%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `refined_best_yolo11s.onnx` | Refined (15 eps) | 19.2 MB | 281.1 ms | 10/16 (62.5%) | 4/4 (100%) | 6/16 (37.5%) | 0% (0/5) |
-| `refined_best_yolo26n.onnx` | Refined (15 eps) | 5.8 MB | 100.0 ms | 13/16 (81.2%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `refined_best_yolo26s.onnx` | Refined (15 eps) | 19.8 MB | 210.0 ms | 10/16 (62.5%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `refined_best_yolov10n.onnx` | Refined (15 eps) | 5.6 MB | 118.4 ms | 9/16 (56.2%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
-| `refined_best_yolov10s.onnx` | Refined (15 eps) | 16.5 MB | 257.2 ms | 12/16 (75.0%) | 4/4 (100%) | 7/16 (43.8%) | 0% (0/5) |
+| **`balanced_best_yolo11n.onnx`** | **Balanced 1:1 (25 eps)** | **5.5 MB** | **104.2 ms** | **11/16 (68.8%)** | **4/4 passed** | **7/16 (43.8%)** | **0% (0/5)** |
+| `balanced_best_yolo11s.onnx` | Balanced 1:1 (25 eps) | 19.2 MB | 232.4 ms | 11/16 (68.8%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `balanced_best_yolo26n.onnx` | Balanced 1:1 (25 eps) | 5.8 MB | 114.8 ms | 8/16 (50.0%) | 4/4 passed | 6/16 (37.5%) | 0% (0/5) |
+| `balanced_best_yolov10n.onnx` | Balanced 1:1 (25 eps) | 5.6 MB | 114.9 ms | 10/16 (62.5%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `balanced_best_yolov10s.onnx` | Balanced 1:1 (25 eps) | 16.5 MB | 231.9 ms | 12/16 (75.0%) | 4/4 passed | 6/16 (37.5%) | 0% (0/5) |
+| `best.onnx` | Baseline (50 eps) | 5.5 MB | 132.7 ms | 10/16 (62.5%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `best_yolo10n.onnx` | Baseline (15 eps) | 5.6 MB | 117.4 ms | 10/16 (62.5%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `best_yolo10s.onnx` | Baseline (15 eps) | 16.5 MB | 265.8 ms | 12/16 (75.0%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `best_yolo11n.onnx` | Baseline (15 eps) | 5.5 MB | 136.0 ms | 11/16 (68.8%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `best_yolo11s.onnx` | Baseline (15 eps) | 19.2 MB | 266.9 ms | 11/16 (68.8%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `best_yolo26n.onnx` | Baseline (15 eps) | 5.8 MB | 105.3 ms | 9/16 (56.2%) | 4/4 passed | 6/16 (37.5%) | 0% (0/5) |
+| `best_yolo26s.onnx` | Baseline (15 eps) | 19.8 MB | 249.4 ms | 11/16 (68.8%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `best_yolo8.onnx` | Baseline (50 eps) | 6.2 MB | 170.3 ms | 9/16 (56.2%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `refined_best_yolo11n.onnx` | Refined (15 eps) | 5.5 MB | 134.2 ms | 9/16 (56.2%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `refined_best_yolo11s.onnx` | Refined (15 eps) | 19.2 MB | 281.1 ms | 10/16 (62.5%) | 4/4 passed | 6/16 (37.5%) | 0% (0/5) |
+| `refined_best_yolo26n.onnx` | Refined (15 eps) | 5.8 MB | 100.0 ms | 13/16 (81.2%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `refined_best_yolo26s.onnx` | Refined (15 eps) | 19.8 MB | 210.0 ms | 10/16 (62.5%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `refined_best_yolov10n.onnx` | Refined (15 eps) | 5.6 MB | 118.4 ms | 9/16 (56.2%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+| `refined_best_yolov10s.onnx` | Refined (15 eps) | 16.5 MB | 257.2 ms | 12/16 (75.0%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
 | `yolov8n.onnx` (Pre-trained) | Zero-shot COCO | 6.2 MB | 169.9 ms | 0/16 (0.0%) | 0/4 (0.0%) | 0/16 (0.0%) | 0% (0/5) |
 
 *(Note: The 43.8% (7/16) gate open rate represents 100% of all valid, pass-eligible vehicle test images; 5 are deliberate negative samples and 4 are blurred/stress non-standard plates).*
+
+> [!IMPORTANT]
+> **Sample Size & Recall Transparency**: The 4/4 motorcycle metric represents successful localization strictly across the 4 dual-row motorbike test images in this benchmark suite (`bike_test_9` through `bike_test_12`). While it verifies that the balanced 1:1 training strategy resolved the dual-row aspect ratio blindness of older car-only models, it is an empirical benchmark on a small sample ($N=4$), not a guarantee that all motorbikes under real-world solar glare or dirt will be detected. In actual operation, if severe glare drops detector confidence below 0.25, the system aborts before OCR can even run (detailed in Section 5.D).
 
 ### Selection Rationale: `balanced_best_yolo11n.onnx`
 1. **CPU Latency Efficiency**: Achieves a steady-state detection latency of **104.2 ms**, which is **2.23x faster** than Small (`s`) models (232.4 ms).
@@ -184,6 +187,34 @@ Vietnamese motorcycle license plates are square dual-row plates ($190 \times 140
 
 ### C. Negative Background Sample Conditioning
 By including 120 negative images (empty campus boom barriers, road pavement, and bicycle frames) labeled with empty annotations, the detection model learns strict plate boundary features. False detections on campus infrastructure dropped from 18.2% in unconditioned baselines to **0.0%**.
+
+### D. Limitations & Cascaded Gatekeeper Dilemma (The "Didn't Even Try" Vulnerability)
+
+A key scientific finding from field evaluation is the **Cascaded Gatekeeper Vulnerability** inherent in two-stage object detection + OCR pipelines:
+
+```text
+Camera Snapshot (1080p) ---> [Step 1: YOLO Detector] ---> Confidence >= 0.25?
+                                     |
+                            +--------+--------+
+                            |                 |
+                          [YES]              [NO] (e.g. 0.22 due to glare)
+                            |                 |
+                            v                 v
+                   [Step 2: OCR Runs]    [OCR Completely Bypassed]
+                   (Attempts to read)    (Pipeline aborts: 0 boxes found)
+```
+
+1. **The Glare & Specular Reflection Problem**:
+   * Outdoor campus parking gates in Vietnam experience intense tropical sunlight. Specular reflections off glossy acrylic plate covers or curved chrome bezels create bright flare spots that eliminate local gradient contrast.
+   * While human security staff can easily squint, filter out specular glare, and read the underlying characters, the YOLO neural network relies on boundary edge contrasts. Direct glare drops proposal confidence from typical levels ($>0.70$) below the detection acceptance threshold ($\tau = 0.25$).
+   * **The Consequence**: Because YOLO outputs 0 detected bounding boxes, **the OCR engine is never invoked**. To an observer, the system *"didn't even try"* to read a plate that appears visually legible to human eyes. This failure mode was empirically demonstrated on `car_test_7.jpg` (partially occluded plate) and `car_test_8.jpg` (heavy motion blur), where valid vehicles were refused entry without any text extraction attempt.
+
+2. **Engineering Mitigations for EIU Campus Deployment**:
+   * **Optical Glare Attenuation (Hardware)**: Gate entrance CCTV cameras must be fitted with Circular Polarizing (CPL) optical filters to suppress up to 80% of polarized specular surface reflections. Additionally, auxiliary LED illumination must be mounted at a $45^\circ$ angle rather than co-axial with the lens to prevent direct backscatter into the camera sensor.
+   * **Multi-Factor Trigger Fallback (Software)**: In actual gate deployment, vehicle arrival is physically confirmed by an inductive ground loop sensor or student/staff RFID card swipe. If physical vehicle presence is confirmed but Step 1 YOLO returns 0 boxes at $\tau = 0.25$, the pipeline triggers an automated fallback:
+     1. Contrast Limited Adaptive Histogram Equalization (CLAHE) is applied to neutralize glare.
+     2. YOLO re-scans at a relaxed confidence threshold ($\tau = 0.15$).
+     3. Only if no plate boundary can be established after this fallback does the system issue a barrier rejection and flag security for manual verification.
 
 ---
 
