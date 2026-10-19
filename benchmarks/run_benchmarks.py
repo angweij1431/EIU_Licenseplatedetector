@@ -19,12 +19,14 @@ from lpr_core.validator import VietnamPlateValidator
 
 # Parse command line argument for vehicle test image or directory path
 parser = argparse.ArgumentParser(description="Run LPR Pipeline Benchmark on an Image or Directory of Images")
-parser.add_argument("input_path", nargs="?", default="test_images/car_test_3.jpg", help="Path to input image or directory (default: test_images/car_test_3.jpg)")
+parser.add_argument("input_path", nargs="?", default=None, help="Path to input image or directory (default: test_images)")
+parser.add_argument("--image_path", default=None, help="Path to input image or directory (flag alternative)")
 parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to detector model (default: Models_yolo/best.onnx)")
 parser.add_argument("--ocr", default="paddleocr", help="OCR engine mode: paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet, cct_xs (default: paddleocr)")
+parser.add_argument("--output_dir", default=None, help="Directory to save output annotated images (optional)")
 args = parser.parse_args()
 
-target_path = args.input_path
+target_path = args.image_path or args.input_path or "test_images"
 if not os.path.exists(target_path):
     raise FileNotFoundError(f"Target path not found: {target_path}")
 
@@ -66,7 +68,8 @@ for idx, img_path in enumerate(image_files):
         save_annotated_name=annotated_name, 
         sort_by='front', 
         primary_only=True, 
-        padding_percent=0.20
+        padding_percent=0.20,
+        output_dir=args.output_dir
     )
     
     extracted_text = "NONE"
