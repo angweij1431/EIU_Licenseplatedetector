@@ -341,7 +341,7 @@ class LPRNetAdapter(BaseOCR):
 
         h, w = image_crop.shape[:2]
         aspect_ratio = w / float(h) if h > 0 else 1.0
-        slices = [image_crop] if aspect_ratio > 2.2 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
+        slices = [image_crop] if aspect_ratio > 1.5 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
 
         results = []
         for s in slices:
@@ -482,11 +482,16 @@ class LPRPipeline:
         if not detections or img is None:
             return ocr_results, was_enhanced
             
+        is_lprnet = isinstance(self.ocr, LPRNetAdapter)
         for idx, d in enumerate(detections):
             x1, y1, x2, y2 = map(int, d['box'])
             h, w, _ = img.shape
-            pad_w = max(20, int((x2 - x1) * padding_percent))
-            pad_h = max(15, int((y2 - y1) * padding_percent))
+            if is_lprnet:
+                pad_w = max(2, int((x2 - x1) * 0.02))
+                pad_h = max(2, int((y2 - y1) * 0.02))
+            else:
+                pad_w = max(20, int((x2 - x1) * padding_percent))
+                pad_h = max(15, int((y2 - y1) * padding_percent))
             
             crop_x1 = max(0, x1 - pad_w)
             crop_y1 = max(0, y1 - pad_h)
@@ -504,7 +509,7 @@ class LPRPipeline:
                 is_blurry = (blur_score < 150.0) or is_low_res
                 
                 if not apply_enhancement:
-                    if is_blurry and self.enable_preprocessing:
+                    if is_blurry and self.enable_preprocessing and not is_lprnet:
                         reason = f"low resolution ({crop_w}x{crop_h})" if is_low_res else f"sharpness {blur_score:.1f} < 150.0"
                         print(f"  [Adaptive Recovery] Plate needs enhancement ({reason}). Auto-applying stroke & resolution recovery...")
                         enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
@@ -516,11 +521,15 @@ class LPRPipeline:
                         raw_text_results = self.ocr.recognize(crop)
                 else:
                     # 2nd try: Explicit escalation or forced enhancement
-                    print(f"  [2nd try - Enhancement Pass] Applying adaptive image enhancement (sharpness: {blur_score:.1f})...")
-                    enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
-                    raw_text_results = self.ocr.recognize(enhanced_crop)
-                    final_crop = enhanced_crop
-                    was_enhanced = True
+                    if is_lprnet:
+                        # LPRNet expects tightly bounded crops matching its 94x24 input geometry
+                        raw_text_results = self.ocr.recognize(crop)
+                    else:
+                        print(f"  [2nd try - Enhancement Pass] Applying adaptive image enhancement (sharpness: {blur_score:.1f})...")
+                        enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
+                        raw_text_results = self.ocr.recognize(enhanced_crop)
+                        final_crop = enhanced_crop
+                        was_enhanced = True
                     
                 if save_crop:
                     crop_filename = f"{model_tag}_crop_{crop_identifier}_{idx+1}.jpg"
