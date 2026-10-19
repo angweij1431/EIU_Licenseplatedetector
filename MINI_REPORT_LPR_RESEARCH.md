@@ -249,7 +249,7 @@ To address the 1.2 – 2.8 second OCR bottleneck in Phase 1, an ablation was con
 
 ### Empirical Comparison Matrix
 
-| Evaluation Dimension | Production Engine: PaddleOCR (PP-OCRv4) | Edge Candidate: LPRNet (Vietnamese CTC) | Impact on Deployment |
+| Evaluation Dimension | Production Engine: PaddleOCR (PP-OCRv6) | Edge Candidate: LPRNet (Vietnamese CTC) | Impact on Deployment |
 | :--- | :--- | :--- | :--- |
 | **Model Disk Footprint** | ~150 MB (Detection + Recognition) | **2.05 MB** (`lprnet.onnx`) | **73x storage reduction** |
 | **RAM Utilization** | ~1.2 GB active heap | **~45 MB** tensor footprint | Essential for low-RAM industrial edge IPCs |
