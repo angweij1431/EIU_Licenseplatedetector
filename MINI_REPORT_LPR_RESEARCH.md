@@ -113,6 +113,13 @@ We tested 3 different training approaches for the YOLO models:
 * **Why OCR is 0.0 ms on negatives/blurs**: When YOLO finds 0 boxes, the pipeline skips OCR completely to save CPU power.
 * **Why OCR takes longer on hard plates**: On blurry or angled plates, the pipeline runs multi-pass enhancement (stroke repair or deep zoom) to attempt text recovery, increasing the reading time.
 
+#### Average Speed Summary (The Bottom Line):
+* **Average YOLO11n Detection Speed**: **104.2 ms** (Fast and edge-ready; finding the plate takes only ~4% of the processing time).
+* **Average PaddleOCR Recognition Speed**:
+  * **Clean 1st-Try Plates**: **~1,200 – 1,320 ms** (Single-pass reading on clear car plates like `car_test_4` and `car_test_5`).
+  * **Suite Average (Across all 15 images)**: **~2,568 ms** (Includes multi-pass stroke repair and deep zoom on challenging/blurry plates).
+* **Why this metric matters**: It clearly proves that the YOLO detector is not the bottleneck (104 ms), while the general document OCR (PaddleOCR) takes over 90% of the waiting time. This directly justifies the switch to lightweight LPRNet (~30 ms) in Section 4.
+
 ---
 
 ## 4. Improvement Plan: Replacing PaddleOCR with LPRNet
