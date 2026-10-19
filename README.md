@@ -60,22 +60,22 @@ The evaluation suite has 16 real-world test images covering cars, motorbikes, sm
 
 | Thumbnail | File Name | Category | Ground Truth | Clean Target | Expected Gate Action |
 | :---: | :--- | :--- | :---: | :---: | :---: |
-| <img src="test_images/bike_test_10.jpg" width="100"/> | `bike_test_10.jpg` | Motorbike (2-line) | `43-D1 999.99` | `43D199999` | **GATE_OPEN (Try 1)** |
-| <img src="test_images/bike_test_11.jpg" width="100"/> | `bike_test_11.jpg` | Motorbike (2-line) | `29-H1 339.79` | `29H133979` | **GATE_OPEN (Try 1)** |
-| <img src="test_images/bike_test_12.jpg" width="100"/> | `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN (Try 2)** |
-| <img src="test_images/bike_test_9.jpg" width="100"/> | `bike_test_9.jpg` | Motorbike (2-line) | `59-D2 420.69` | `59D242069` | **GATE_OPEN (Try 1)** |
-| <img src="test_images/car_test_2.jpg" width="100"/> | `car_test_2.jpg` | Car (Front) | `30E-697.70` | `30E69770` | **GATE_CLOSED (Audit Flag)** |
-| <img src="test_images/car_test_3.jpg" width="100"/> | `car_test_3.jpg` | Car (Distant/Angled) | `29M-6840` | `29M6840` | **GATE_OPEN (Try 2)** |
-| <img src="test_images/car_test_4.jpg" width="100"/> | `car_test_4.jpg` | Car (Rear) | `51G-743.72` | `51G74372` | **GATE_OPEN (Try 1)** |
-| <img src="test_images/car_test_5.jpg" width="100"/> | `car_test_5.jpg` | Car (Front) | `51G-777.77` | `51G77777` | **GATE_OPEN (Try 1)** |
-| <img src="test_images/car_test_6.jpg" width="100"/> | `car_test_6.jpg` | Commercial Truck | `63H-903.94` | `63H90394` | **GATE_OPEN (Try 2)** |
-| <img src="test_images/car_test_7.jpg" width="100"/> | `car_test_7.jpg` | Traffic Scene | Obscured / Landmark | Non-plate | **GATE_CLOSED (Safe Rejection)** |
-| <img src="test_images/car_test_8.jpg" width="100"/> | `car_test_8.jpg` | Heavy Motion Blur | Non-resolvable | Non-plate | **GATE_CLOSED (Safe Rejection)** |
-| <img src="test_images/neg_sample_test_1.jpg" width="100"/> | `neg_sample_test_1.jpg` | Negative Sample | None (Walkway) | None | **GATE_CLOSED (Safe Rejection)** |
-| <img src="test_images/neg_sample_test_2.jpg" width="100"/> | `neg_sample_test_2.jpg` | Negative Sample | None (Pavement) | None | **GATE_CLOSED (Safe Rejection)** |
-| <img src="test_images/neg_sample_test_3.jpg" width="100"/> | `neg_sample_test_3.jpg` | Negative Sample | None (Bicycle Frame) | None | **GATE_CLOSED (Safe Rejection)** |
-| <img src="test_images/neg_sample_test_4.jpg" width="100"/> | `neg_sample_test_4.jpg` | Negative Sample | None (Pedestrian/Text) | None | **GATE_CLOSED (Safe Rejection)** |
-| <img src="test_images/neg_sample_test_5.jpg" width="100"/> | `neg_sample_test_5.jpg` | Negative Sample | None (Campus Gate) | None | **GATE_CLOSED (Safe Rejection)** |
+| <img src="./test_images/bike_test_10.jpg" width="100"/> | `bike_test_10.jpg` | Motorbike (2-line) | `43-D1 999.99` | `43D199999` | **GATE_OPEN (Try 1)** |
+| <img src="./test_images/bike_test_11.jpg" width="100"/> | `bike_test_11.jpg` | Motorbike (2-line) | `29-H1 339.79` | `29H133979` | **GATE_OPEN (Try 1)** |
+| <img src="./test_images/bike_test_12.jpg" width="100"/> | `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN (Try 2)** |
+| <img src="./test_images/bike_test_9.jpg" width="100"/> | `bike_test_9.jpg` | Motorbike (2-line) | `59-D2 420.69` | `59D242069` | **GATE_OPEN (Try 1)** |
+| <img src="./test_images/car_test_2.jpg" width="100"/> | `car_test_2.jpg` | Car (Front) | `30E-697.70` | `30E69770` | **GATE_CLOSED (Audit Flag)** |
+| <img src="./test_images/car_test_3.jpg" width="100"/> | `car_test_3.jpg` | Car (Distant/Angled) | `29M-6840` | `29M6840` | **GATE_OPEN (Try 2)** |
+| <img src="./test_images/car_test_4.jpg" width="100"/> | `car_test_4.jpg` | Car (Rear) | `51G-743.72` | `51G74372` | **GATE_OPEN (Try 1)** |
+| <img src="./test_images/car_test_5.jpg" width="100"/> | `car_test_5.jpg` | Car (Front) | `51G-777.77` | `51G77777` | **GATE_OPEN (Try 1)** |
+| <img src="./test_images/car_test_6.jpg" width="100"/> | `car_test_6.jpg` | Commercial Truck | `63H-903.94` | `63H90394` | **GATE_OPEN (Try 2)** |
+| <img src="./test_images/car_test_7.jpg" width="100"/> | `car_test_7.jpg` | Traffic Scene | Obscured / Landmark | Non-plate | **GATE_CLOSED (Safe Rejection)** |
+| <img src="./test_images/car_test_8.jpg" width="100"/> | `car_test_8.jpg` | Heavy Motion Blur | Non-resolvable | Non-plate | **GATE_CLOSED (Safe Rejection)** |
+| <img src="./test_images/neg_sample_test_1.jpg" width="100"/> | `neg_sample_test_1.jpg` | Negative Sample | None (Walkway) | None | **GATE_CLOSED (Safe Rejection)** |
+| <img src="./test_images/neg_sample_test_2.jpg" width="100"/> | `neg_sample_test_2.jpg` | Negative Sample | None (Pavement) | None | **GATE_CLOSED (Safe Rejection)** |
+| <img src="./test_images/neg_sample_test_3.jpg" width="100"/> | `neg_sample_test_3.jpg` | Negative Sample | None (Bicycle Frame) | None | **GATE_CLOSED (Safe Rejection)** |
+| <img src="./test_images/neg_sample_test_4.jpg" width="100"/> | `neg_sample_test_4.jpg` | Negative Sample | None (Pedestrian/Text) | None | **GATE_CLOSED (Safe Rejection)** |
+| <img src="./test_images/neg_sample_test_5.jpg" width="100"/> | `neg_sample_test_5.jpg` | Negative Sample | None (Campus Gate) | None | **GATE_CLOSED (Safe Rejection)** |
 
 ---
 
@@ -117,13 +117,13 @@ Here are the real physical outputs generated by `balanced_best_yolo11n.onnx` acr
 
 | `bike_test_9.jpg` | `bike_test_10.jpg` |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_9.jpg" width="340" /> | <img src="Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_10.jpg" width="340" /> |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_9.jpg" width="340" /> | <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_10.jpg" width="340" /> |
 | **`59D242069`** | **`43D199999`** |
 | Status: **GATE_OPEN (Try 1 at 640px)**<br/>Det: 61.0 ms \| OCR: 2235.7 ms | Status: **GATE_OPEN (Try 1 at 640px)**<br/>Cold Start Det: 3227.7 ms \| OCR: 2420.3 ms |
 
 | `bike_test_11.jpg` | `bike_test_12.jpg` |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_11.jpg" width="340" /> | <img src="Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_12.jpg" width="340" /> |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_11.jpg" width="340" /> | <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_12.jpg" width="340" /> |
 | **`29H133979`** | **`61H76854`** |
 | Status: **GATE_OPEN (Try 1 at 640px)**<br/>Det: 73.4 ms \| OCR: 1956.0 ms | Status: **GATE_OPEN (Try 2 - Stroke Repair)**<br/>Det: 50.0 ms \| OCR: 2841.2 ms |
 
@@ -133,13 +133,13 @@ Here are the real physical outputs generated by `balanced_best_yolo11n.onnx` acr
 
 | `car_test_4.jpg` | `car_test_5.jpg` |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_car_test_4.jpg" width="340" /> | <img src="Outputs/balanced_output/balanced_best_yolo11n_output_car_test_5.jpg" width="340" /> |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_car_test_4.jpg" width="340" /> | <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_car_test_5.jpg" width="340" /> |
 | **`51G74372`** | **`51G77777`** |
 | Status: **GATE_OPEN (Try 1 at 640px)**<br/>Det: 62.2 ms \| OCR: 1204.9 ms | Status: **GATE_OPEN (Try 1 at 640px)**<br/>Det: 58.0 ms \| OCR: 1322.6 ms |
 
 | `car_test_6.jpg` | `car_test_3.jpg` |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_car_test_6.jpg" width="340" /> | <img src="Outputs/balanced_output/balanced_best_yolo11n_output_car_test_3.jpg" width="340" /> |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_car_test_6.jpg" width="340" /> | <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_car_test_3.jpg" width="340" /> |
 | **`63H90394`** | Distant Angled Vehicle |
 | Status: **GATE_OPEN (Try 2 - Enhanced)**<br/>Det: 75.4 ms \| OCR: 4013.4 ms | Status: **GATE_CLOSED (Audit Flag)**<br/>Det: 125.0 ms (Plate caught at 32.8% conf) |
 
@@ -149,13 +149,13 @@ Here are the real physical outputs generated by `balanced_best_yolo11n.onnx` acr
 
 | `car_test_2.jpg` | `car_test_7.jpg` |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_car_test_2.jpg" width="340" /> | <img src="Outputs/balanced_output/balanced_best_yolo11n_output_car_test_7.jpg" width="340" /> |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_car_test_2.jpg" width="340" /> | <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_car_test_7.jpg" width="340" /> |
 | **`30169770`** (Non-standard plate font) | Roadway / Traffic Landmark |
 | Status: **GATE_CLOSED (Security Audit)**<br/>Det: 148.8 ms \| OCR: 6114.4 ms | Status: **GATE_CLOSED (Zero Detections)**<br/>Det: 126.8 ms (Safely suppressed) |
 
 | `car_test_8.jpg` | |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_car_test_8.jpg" width="340" /> | |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_car_test_8.jpg" width="340" /> | |
 | Severe Motion Blur | |
 | Status: **GATE_CLOSED (Zero Detections)**<br/>Det: 121.5 ms (Safely suppressed) | |
 
@@ -165,19 +165,19 @@ Here are the real physical outputs generated by `balanced_best_yolo11n.onnx` acr
 
 | `neg_sample_test_1.jpg` | `neg_sample_test_2.jpg` |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_1.jpg" width="340" /> | <img src="Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_2.jpg" width="340" /> |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_1.jpg" width="340" /> | <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_2.jpg" width="340" /> |
 | Pedestrian Walkway | Street Scene & Trees |
 | Status: **GATE_CLOSED (0 Boxes Found)**<br/>Det: 123.7 ms \| Rejection Rate: 100% | Status: **GATE_CLOSED (0 Boxes Found)**<br/>Det: 135.0 ms \| Rejection Rate: 100% |
 
 | `neg_sample_test_3.jpg` | `neg_sample_test_4.jpg` |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_3.jpg" width="340" /> | <img src="Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_4.jpg" width="340" /> |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_3.jpg" width="340" /> | <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_4.jpg" width="340" /> |
 | Bicycle Frame & Grille | Person Walking |
 | Status: **GATE_CLOSED (Format Discard)**<br/>Det: 121.7 ms \| Rejection Rate: 100% | Status: **GATE_CLOSED (Format Discard)**<br/>Det: 148.4 ms \| Rejection Rate: 100% |
 
 | `neg_sample_test_5.jpg` | |
 | :---: | :---: |
-| <img src="Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_5.jpg" width="340" /> | |
+| <img src="./Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_5.jpg" width="340" /> | |
 | Campus Gate Boom Barrier | |
 | Status: **GATE_CLOSED (0 Boxes Found)**<br/>Det: 132.4 ms \| Rejection Rate: 100% | |
 
