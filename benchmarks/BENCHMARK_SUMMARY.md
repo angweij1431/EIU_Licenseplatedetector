@@ -399,3 +399,16 @@ updated benchmark tests for 15 oct with new test images incl neg samples and bic
 | 2026-10-16 15:13:55 | `neg_sample_test_3.jpg` | 3rd try | 1024px | 1 | `583F55` | NO | 328.1 | 734.1 |
 | 2026-10-16 15:13:55 | `neg_sample_test_4.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 696.3 | 0.0 |
 | 2026-10-16 15:13:55 | `neg_sample_test_5.jpg` | 3rd try (exhausted) | 1024px | 0 | `NONE` | NO | 185.9 | 0.0 |
+| 2026-10-16 15:35:12 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `565555555` | NO | 4183.8 | 810.4 |
+| 2026-10-16 15:36:57 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G74372` | YES | 2908.4 | 1297.1 |
+| 2026-10-16 15:40:24 | `bike_test_9.jpg` | 3rd try | 1024px | 1 | `6BZ674420664` | NO | 2990.5 | 929.4 |
+| 2026-10-16 15:42:15 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `518B544342` | NO | 5789.5 | 520.6 |
+| 2026-10-16 15:52:18 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `518B544342` | NO | 4012.7 | 544.9 |
+| 2026-10-16 15:56:09 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G74372` | YES | 2691.0 | 1220.1 |
+| 2026-10-16 16:32:24 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `71` | NO | 4630.7 | 407.1 |
+| 2026-10-16 16:39:35 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `5G7439` | NO | 2871.5 | 140.5 |
+| 2026-10-16 16:40:55 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `5G7439` | NO | 2861.5 | 213.1 |
+| 2026-10-16 17:13:14 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `G7439` | NO | 4597.7 | 335.5 |
+| 2026-10-19 10:32:31 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `G7439` | NO | 7048.8 | 360.3 |
+| 2026-10-19 10:33:47 | `car_test_4.jpg` | 3rd try | 1024px | 1 | `G73` | NO | 4481.4 | 261.4 |
+| 2026-10-19 10:37:24 | `car_test_4.jpg` | 1st try | 640px | 1 | `51G74372` | YES | 3373.9 | 1956.5 |
