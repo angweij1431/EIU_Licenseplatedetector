@@ -549,7 +549,7 @@ class LPRPipeline:
     def process(self, image_path: str, save_annotated_name: str = "output_annotated.jpg", 
                 sort_by: str = 'front', primary_only: bool = True, padding_percent: float = 0.20,
                 force_second_try: bool = False, force_third_try: bool = False,
-                measure_warm: bool = False):
+                measure_warm: bool = False, output_dir: str = None, save_crops: bool = False):
         start_time = time.time()
         is_cold_start = getattr(self, '_is_first_run', True)
         self._is_first_run = False
@@ -557,7 +557,8 @@ class LPRPipeline:
         # Determine model tag and target output directory
         model_name = getattr(self.detector, 'model_name', 'yolo')
         model_stem = os.path.splitext(os.path.basename(model_name))[0]
-        target_dir = get_target_output_dir(model_name)
+        target_dir = output_dir if output_dir is not None else get_target_output_dir(model_name)
+        os.makedirs(target_dir, exist_ok=True)
         
         img_stem = os.path.splitext(os.path.basename(image_path))[0]
         annotated_base = f"{model_stem}_output_{img_stem}.jpg"
@@ -588,7 +589,7 @@ class LPRPipeline:
         print(f"  [1st try - 640px] Found {len(detections)} detection(s) in {det_latency_ms:.1f}ms")
         
         ocr_start = time.time()
-        ocr_results, was_enhanced = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=False, target_dir=target_dir, model_tag=model_stem)
+        ocr_results, was_enhanced = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=False, target_dir=target_dir, model_tag=model_stem, save_crop=save_crops)
         ocr_latency_ms = (time.time() - ocr_start) * 1000
         
         # If blur enhancement was needed to read the plate, mark it honestly as 2nd try
@@ -610,7 +611,7 @@ class LPRPipeline:
             reason = "Forced 2nd try requested" if force_second_try else "1st try unverified"
             print(f"  [2nd try - Adaptive Enhancement] {reason}. Running enhancement on existing crop...")
             ocr_start_enh = time.time()
-            enh_results, _ = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True, target_dir=target_dir, model_tag=model_stem)
+            enh_results, _ = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True, target_dir=target_dir, model_tag=model_stem, save_crop=save_crops)
             ocr_latency_ms += (time.time() - ocr_start_enh) * 1000
             if force_second_try or self._is_strictly_valid(enh_results) or len(enh_results) > len(ocr_results):
                 ocr_results = enh_results
@@ -634,7 +635,7 @@ class LPRPipeline:
                 detections = zoom_detections
                 try_level = "3rd try"
                 ocr_start_2 = time.time()
-                ocr_results, _ = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=self.enable_preprocessing, target_dir=target_dir, model_tag=model_stem)
+                ocr_results, _ = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=self.enable_preprocessing, target_dir=target_dir, model_tag=model_stem, save_crop=save_crops)
                 ocr_latency_ms += (time.time() - ocr_start_2) * 1000
                 print(f"3rd try succeeded: Found plate at 1024px zoom | Conf: {detections[0]['confidence']:.2f}")
             else:
@@ -708,7 +709,8 @@ class LPRPipeline:
         img_h, img_w = annotated_img.shape[:2]
 
         # Formulate HUD text lines
-        hud_line1 = f"Model: {model_stem} | {run_tag} | Status: {try_level} ({resolution})"
+        ocr_tag = self.ocr.__class__.__name__.replace("Adapter", "").replace("Recognizer", "")
+        hud_line1 = f"Model: {model_stem} + {ocr_tag} | {run_tag} | Status: {try_level} ({resolution})"
         if measure_warm:
             hud_line2 = f"Cold: {cold_total_ms:.0f}ms (Det: {cold_det_ms:.0f}ms) | Warm: {warm_total_ms:.0f}ms (Det: {warm_det_ms:.0f}ms)"
         elif is_cold_start:
