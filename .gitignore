@@ -25,6 +25,24 @@ Outputs/*.png
 !Outputs/**/.gitkeep
 !Outputs/.gitkeep
 
+# Explicitly track the 16 benchmark output images displayed in README.md
+!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_9.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_10.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_11.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_12.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_2.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_3.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_4.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_5.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_6.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_7.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_8.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_1.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_2.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_3.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_4.jpg
+!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_5.jpg
+
 # Ignore local test images (uncomment if you don't want test images tracked in git)
 # test_images/
 
