@@ -181,6 +181,56 @@ class LPRNet(nn.Module):
         return logits.squeeze(2) # [Batch, Class_Num, Seq_Len]
 
 # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Step 4.5: Lean Synthetic Plate Booster (Targeting H, D, G, B, C, K, M, N, S, T)
+# ------------------------------------------------------------------------------
+synth_dir = "synthetic_vietnam_plates"
+os.makedirs(synth_dir, exist_ok=True)
+
+TARGET_LETTERS = ["H", "D", "B", "C", "K", "M", "N", "S", "T", "G"]
+TARGET_PROVINCES = ["29", "30", "51", "59", "43", "61", "63", "72", "86", "99", "14", "18", "36", "37"]
+
+def draw_centered_text(img, text, y_pos, font_scale=1.0, thickness=2):
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness)
+    x_pos = max(8, (img.shape[1] - tw) // 2)
+    cv2.putText(img, text, (x_pos, y_pos), cv2.FONT_HERSHEY_DUPLEX, font_scale, (15, 15, 15), thickness, cv2.LINE_AA)
+
+print("Synthesizing 1,000 lean plates for critical letters (H, D, G, etc.) and bikes...")
+synth_count = 0
+
+# 800 Dual-Row Motorbike Plates (Aspect Ratio ~ 1.33)
+for i in range(800):
+    prov = random.choice(TARGET_PROVINCES)
+    let = TARGET_LETTERS[i % len(TARGET_LETTERS)]
+    num_series = str(random.randint(1, 9))
+    top_text = f"{prov}{let}{num_series}"
+    bot_digits = "".join([str(random.randint(0, 9)) for _ in range(random.choice([4, 5]))])
+    full_label = f"{top_text}{bot_digits}"
+    
+    img = np.full((150, 200, 3), random.randint(238, 252), dtype=np.uint8)
+    cv2.rectangle(img, (4, 4), (196, 146), (20, 20, 20), 3)
+    draw_centered_text(img, f"{prov}-{let}{num_series}", 58, font_scale=1.0, thickness=2)
+    bot_display = f"{bot_digits[:3]}.{bot_digits[3:]}" if len(bot_digits) == 5 else bot_digits
+    draw_centered_text(img, bot_display, 126, font_scale=1.0, thickness=2)
+    
+    cv2.imwrite(os.path.join(synth_dir, f"{full_label}_{i}.jpg"), img)
+    synth_count += 1
+
+# 200 Rectangular Car Plates (Aspect Ratio ~ 4.0)
+for i in range(200):
+    prov = random.choice(TARGET_PROVINCES)
+    let = TARGET_LETTERS[i % len(TARGET_LETTERS)]
+    digits = "".join([str(random.randint(0, 9)) for _ in range(5)])
+    full_label = f"{prov}{let}{digits}"
+    
+    img = np.full((90, 360, 3), random.randint(238, 252), dtype=np.uint8)
+    cv2.rectangle(img, (3, 3), (357, 87), (20, 20, 20), 2)
+    draw_centered_text(img, f"{prov}{let}-{digits[:3]}.{digits[3:]}", 60, font_scale=1.1, thickness=2)
+    cv2.imwrite(os.path.join(synth_dir, f"{full_label}_{i}.jpg"), img)
+    synth_count += 1
+
+print(f"Generated {synth_count:,} targeted plates in '{synth_dir}/'.")
+
 # Step 5: Multi-Row Plate Slicing, Normalization & Data Augmentation
 # ------------------------------------------------------------------------------
 def extract_plate_label(filename):
@@ -219,11 +269,11 @@ class RealVietnameseDataset(Dataset):
 
             if self.is_train:
                 # 1. Random Perspective / Affine Tilt
-                if random.random() < 0.6:
+                if random.random() < 0.20: # Realistic gate camera tilt
                     h_cur, w_cur = img.shape[:2]
                     pts1 = np.float32([[0, 0], [w_cur, 0], [0, h_cur], [w_cur, h_cur]])
-                    dx = random.uniform(-0.08, 0.08) * w_cur
-                    dy = random.uniform(-0.12, 0.12) * h_cur
+                    dx = random.uniform(-0.04, 0.04) * w_cur
+                    dy = random.uniform(-0.05, 0.05) * h_cur
                     pts2 = np.float32([
                         [max(0, dx), max(0, dy)],
                         [min(w_cur, w_cur - dx), max(0, -dy)],
@@ -288,6 +338,8 @@ def collate_fn(batch):
 # ------------------------------------------------------------------------------
 print("\nAnalyzing plate aspect ratios and creating single-row sample records...")
 clean_files = [p for p in seen_hashes.values() if os.path.exists(p)]
+clean_files.extend(glob.glob(os.path.join(synth_dir, "*.jpg")))
+print(f"Combined training pool: {len(clean_files):,} plates")
 random.seed(42)
 random.shuffle(clean_files)
 
@@ -332,7 +384,7 @@ model = LPRNet(class_num=NUM_CLASSES, dropout_rate=0.3).to(device)
 criterion = nn.CTCLoss(blank=0, zero_infinity=True)
 optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
-EPOCHS = 75
+EPOCHS = 150
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-5)
 best_loss = float("inf")
 

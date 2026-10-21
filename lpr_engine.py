@@ -68,7 +68,7 @@ class BaseDetector(ABC):
 # Abstract base class for optical character recognition models
 class BaseOCR(ABC):
     @abstractmethod
-    def recognize(self, image_crop: np.ndarray):
+    def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
         pass
 
 
@@ -77,7 +77,7 @@ class YOLODetector(BaseDetector):
     # Initializes detector with model weights, target class filter, and confidence threshold
     def __init__(self, model_weights: str = "Models_yolo/best.onnx", 
                  target_classes: list = VEHICLE_CLASSES, 
-                 confidence_threshold: float = 0.25):
+                 confidence_threshold: float = 0.45):
         from ultralytics import YOLO
         if not os.path.exists(model_weights):
             if model_weights.endswith(".onnx"):
@@ -154,7 +154,7 @@ class PaddleOCRAdapter(BaseOCR):
             )
         
     # Performs text recognition on a cropped plate image
-    def recognize(self, image_crop: np.ndarray):
+    def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
         if image_crop is None or image_crop.size == 0:
             raise ValueError("Input image crop to PaddleOCR is empty")
             
@@ -169,6 +169,7 @@ class PaddleOCRAdapter(BaseOCR):
     def _recognize_no_dbnet(self, image_crop: np.ndarray):
         h, w = image_crop.shape[:2]
         aspect_ratio = w / float(h) if h > 0 else 1.0
+
         
         # Slicing logic: square 2-line plates (<= 2.2) vs long 1-line plates
         slices = [image_crop[0:int(h * 0.55), :], image_crop[int(h * 0.45):h, :]] if aspect_ratio <= 2.2 else [image_crop]
@@ -229,6 +230,7 @@ class PaddleOCRAdapter(BaseOCR):
     def _recognize_split_lines(self, image_crop: np.ndarray):
         h, w = image_crop.shape[:2]
         aspect_ratio = w / float(h) if h > 0 else 1.0
+
         
         slices = []
         if aspect_ratio <= 2.5:
@@ -263,6 +265,247 @@ class PaddleOCRAdapter(BaseOCR):
         return ocr_entries
 
 
+# Orders 4 quadrilateral vertices clockwise starting from Top-Left (TL, TR, BR, BL)
+def order_quad_points(pts: np.ndarray) -> np.ndarray:
+    rect = np.zeros((4, 2), dtype="float32")
+    s = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(s)]  # Top-Left has minimum (x + y) sum
+    rect[2] = pts[np.argmax(s)]  # Bottom-Right has maximum (x + y) sum
+    diff = np.diff(pts, axis=1)
+    rect[1] = pts[np.argmin(diff)]  # Top-Right has minimum (y - x) difference
+    rect[3] = pts[np.argmax(diff)]  # Bottom-Left has maximum (y - x) difference
+    return rect
+
+
+# Evaluates candidate license plate contours and calculates a deterministic contour confidence score [0.0, 1.0]
+def compute_plate_quad_and_confidence(image_crop: np.ndarray) -> tuple:
+    if image_crop is None or image_crop.size == 0:
+        return None, 0.0
+
+    h, w = image_crop.shape[:2]
+    crop_area = float(h * w)
+    if crop_area < 50:
+        return None, 0.0
+
+    gray = cv2.cvtColor(image_crop, cv2.COLOR_BGR2GRAY) if len(image_crop.shape) == 3 else image_crop
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # Dual edge and threshold extraction
+    _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    contours_thresh, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    edges = cv2.Canny(blurred, 50, 150)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    edges_closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    contours_canny, _ = cv2.findContours(edges_closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    candidates = []
+    for cnt in list(contours_thresh) + list(contours_canny):
+        area = cv2.contourArea(cnt)
+        if area < 0.25 * crop_area:
+            continue
+
+        peri = cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, 0.03 * peri, True)
+
+        if len(approx) == 4:
+            pts = approx.reshape(4, 2).astype("float32")
+        else:
+            rect = cv2.minAreaRect(cnt)
+            pts = cv2.boxPoints(rect).astype("float32")
+
+        ordered_pts = order_quad_points(pts)
+
+        # Metric 1: Solidity / Area Fill Ratio
+        fill_ratio = min(1.0, area / crop_area)
+        if 0.40 <= fill_ratio <= 0.98:
+            s_fill = 1.0
+        elif fill_ratio < 0.40:
+            s_fill = fill_ratio / 0.40
+        else:
+            s_fill = 0.8
+
+        # Metric 2: Aspect Ratio Consistency (Motorbikes ~ 1.1-1.5, Automobiles ~ 2.0-4.5)
+        tl, tr, br, bl = ordered_pts
+        w_top = np.linalg.norm(tr - tl)
+        w_bot = np.linalg.norm(br - bl)
+        h_left = np.linalg.norm(bl - tl)
+        h_right = np.linalg.norm(br - tr)
+        cw = (w_top + w_bot) / 2.0
+        ch = (h_left + h_right) / 2.0
+        if ch <= 0:
+            continue
+        ar = cw / ch
+
+        if 1.0 <= ar <= 1.6 or 1.8 <= ar <= 4.8:
+            s_ar = 1.0
+        elif 0.8 <= ar < 1.0 or 1.6 < ar < 1.8:
+            s_ar = 0.6
+        else:
+            s_ar = 0.2
+
+        # Metric 3: Corner Angle Orthogonality (deviation from 90 degrees)
+        v0 = tr - tl
+        v1 = br - tr
+        v2 = bl - br
+        v3 = tl - bl
+
+        def angle_deg(va, vb):
+            dot = np.dot(va, vb)
+            norm = (np.linalg.norm(va) * np.linalg.norm(vb)) + 1e-6
+            return np.degrees(np.arccos(np.clip(dot / norm, -1.0, 1.0)))
+
+        a0 = angle_deg(v0, -v3)
+        a1 = angle_deg(v1, -v0)
+        a2 = angle_deg(v2, -v1)
+        a3 = angle_deg(v3, -v2)
+        dev = np.mean([abs(a0 - 90), abs(a1 - 90), abs(a2 - 90), abs(a3 - 90)])
+        s_angle = max(0.0, min(1.0, 1.0 - (dev / 25.0)))
+
+        # Metric 4: Luminance Contrast Differential
+        mask = np.zeros(gray.shape, dtype=np.uint8)
+        cv2.drawContours(mask, [ordered_pts.astype(np.int32)], -1, 255, -1)
+        mean_inside = cv2.mean(gray, mask=mask)[0]
+        inv_mask = cv2.bitwise_not(mask)
+        mean_outside = cv2.mean(gray, mask=inv_mask)[0]
+        lum_diff = mean_inside - mean_outside
+
+        if lum_diff >= 30:
+            s_lum = 1.0
+        elif lum_diff > 0:
+            s_lum = lum_diff / 30.0
+        else:
+            s_lum = 0.5
+
+        total_conf = (0.25 * s_fill) + (0.30 * s_ar) + (0.30 * s_angle) + (0.15 * s_lum)
+        candidates.append((total_conf, ordered_pts))
+
+    if not candidates:
+        return None, 0.0
+
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1], round(candidates[0][0], 3)
+
+
+# Projects quadrilateral crop to canonical orthogonal coordinate frame
+def canonical_perspective_unwarp(image_crop: np.ndarray, pts: np.ndarray) -> np.ndarray:
+    tl, tr, br, bl = pts
+    w_top = np.linalg.norm(tr - tl)
+    w_bot = np.linalg.norm(br - bl)
+    max_w = max(10, int(max(w_top, w_bot)))
+
+    h_left = np.linalg.norm(bl - tl)
+    h_right = np.linalg.norm(br - tr)
+    max_h = max(10, int(max(h_left, h_right)))
+
+    dst_pts = np.array([
+        [0, 0],
+        [max_w - 1, 0],
+        [max_w - 1, max_h - 1],
+        [0, max_h - 1]
+    ], dtype="float32")
+
+    M = cv2.getPerspectiveTransform(pts, dst_pts)
+    return cv2.warpPerspective(image_crop, M, (max_w, max_h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+
+
+# Normalizes plate geometry via canonical perspective unwarp (or affine fallback) and slices dual-row motorbike plates
+def deskew_and_slice_plate(image_crop: np.ndarray, debug_prefix: str = None, save_debug: bool = True) -> list:
+    """
+    Normalizes license plate geometry using 4-corner Canonical Geometry Normalizer
+    when contour confidence >= 0.70, falls back to Hough affine deskewing if low,
+    and slices dual-row motorbike plates into top and bottom strips.
+    """
+    if image_crop is None or image_crop.size == 0:
+        return []
+
+    h, w = image_crop.shape[:2]
+    aspect_ratio = w / float(h) if h > 0 else 1.0
+
+    # Step 1: Attempt Canonical 4-Point Normalization
+    quad_pts, contour_conf = compute_plate_quad_and_confidence(image_crop)
+
+    if contour_conf >= 0.70 and quad_pts is not None:
+        straight = canonical_perspective_unwarp(image_crop, quad_pts)
+        sh, sw = straight.shape[:2]
+        aspect_ratio = sw / float(sh) if sh > 0 else aspect_ratio
+    else:
+        # Step 1b: Fallback to Hough-line tilt detection & affine rotation
+        gray = cv2.cvtColor(image_crop, cv2.COLOR_BGR2GRAY) if len(image_crop.shape) == 3 else image_crop
+        edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+        min_line_len = max(12, int(w * 0.22))
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=20, minLineLength=min_line_len, maxLineGap=8)
+
+        skew_angle = 0.0
+        if lines is not None:
+            valid_angles = []
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                dx = x2 - x1
+                dy = y2 - y1
+                if dx == 0:
+                    continue
+                deg = np.degrees(np.arctan2(dy, dx))
+                if -25.0 <= deg <= 25.0:
+                    valid_angles.append(deg)
+            if valid_angles:
+                skew_angle = float(np.median(valid_angles))
+
+        if abs(skew_angle) > 1.5:
+            center = (w // 2, h // 2)
+            M = cv2.getRotationMatrix2D(center, skew_angle, 1.0)
+            if aspect_ratio > 1.5:
+                straight = cv2.warpAffine(image_crop, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
+            else:
+                cos = np.abs(M[0, 0])
+                sin = np.abs(M[0, 1])
+                nW = int((h * sin) + (w * cos))
+                nH = int((h * cos) + (w * sin))
+                M[0, 2] += (nW / 2) - center[0]
+                M[1, 2] += (nH / 2) - center[1]
+                straight = cv2.warpAffine(image_crop, M, (nW, nH), borderMode=cv2.BORDER_REPLICATE)
+        else:
+            straight = image_crop
+
+    # Aspect ratio > 1.5 indicates a single-row rectangular automobile plate (no horizontal slicing needed)
+    if aspect_ratio > 1.5:
+        if save_debug and debug_prefix:
+            for debug_dir in ["Outputs/deskewed_slices", "debug_slices"]:
+                os.makedirs(debug_dir, exist_ok=True)
+                cv2.imwrite(os.path.join(debug_dir, f"{debug_prefix}_full_crop.jpg"), image_crop)
+                cv2.imwrite(os.path.join(debug_dir, f"{debug_prefix}_deskewed.jpg"), straight)
+        return [straight]
+
+    # Step 2: For dual-row square plates, isolate bright plate surface (discard dark mudguard / bumper)
+    sgray = cv2.cvtColor(straight, cv2.COLOR_BGR2GRAY) if len(straight.shape) == 3 else straight
+    sh, sw = sgray.shape
+    row_means = np.mean(sgray, axis=1)
+    plate_thresh = max(80.0, float(np.mean(row_means) * 0.75))
+    bright_rows = np.where(row_means >= plate_thresh)[0]
+
+    if len(bright_rows) > int(sh * 0.40):
+        y_start = max(0, int(bright_rows[0]))
+        y_end = min(sh, int(bright_rows[-1]) + 1)
+        plate_clean = straight[y_start:y_end, :]
+    else:
+        plate_clean = straight
+
+    # Step 3: Horizontal line slicing with 4% vertical overlap
+    ph, pw = plate_clean.shape[:2]
+    top_slice = plate_clean[0:int(ph * 0.52), :]
+    bot_slice = plate_clean[int(ph * 0.48):ph, :]
+
+    # Step 4: Persist intermediate debug crops for inspection
+    if save_debug and debug_prefix:
+        for debug_dir in ["Outputs/deskewed_slices", "debug_slices"]:
+            os.makedirs(debug_dir, exist_ok=True)
+            cv2.imwrite(os.path.join(debug_dir, f"{debug_prefix}_full_crop.jpg"), image_crop)
+            cv2.imwrite(os.path.join(debug_dir, f"{debug_prefix}_deskewed.jpg"), straight)
+            cv2.imwrite(os.path.join(debug_dir, f"{debug_prefix}_top_slice.jpg"), top_slice)
+            cv2.imwrite(os.path.join(debug_dir, f"{debug_prefix}_bot_slice.jpg"), bot_slice)
+
+    return [top_slice, bot_slice]
+
 # CRNN model adapter (Convolutional Recurrent Neural Network for scene and plate text)
 class CRNNAdapter(BaseOCR):
     def __init__(self, model_path: str = "Models_ocr/crnn.onnx", 
@@ -275,14 +518,12 @@ class CRNNAdapter(BaseOCR):
         self.input_name = self.session.get_inputs()[0].name
         self.chars = list(chars)
 
-    def recognize(self, image_crop: np.ndarray):
+    def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
         if image_crop is None or image_crop.size == 0:
             raise ValueError("Input image crop to CRNN is empty")
         
         # Standard CRNN input dimensions: 100x32 grayscale or RGB
-        h, w = image_crop.shape[:2]
-        aspect_ratio = w / float(h) if h > 0 else 1.0
-        slices = [image_crop] if aspect_ratio > 2.2 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
+        slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
         
         results = []
         for s in slices:
@@ -335,13 +576,11 @@ class LPRNetAdapter(BaseOCR):
         self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
         self.chars = ['_'] + list("0123456789ABCDEFGHKLMNPRSTUVXYZ-") # CTC blank token at index 0 followed by 32 characters
 
-    def recognize(self, image_crop: np.ndarray):
+    def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
         if image_crop is None or image_crop.size == 0:
             raise ValueError("Input image crop to LPRNet is empty")
 
-        h, w = image_crop.shape[:2]
-        aspect_ratio = w / float(h) if h > 0 else 1.0
-        slices = [image_crop] if aspect_ratio > 1.5 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
+        slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
 
         results = []
         for s in slices:
@@ -382,15 +621,13 @@ class CCTXSRecognizerAdapter(BaseOCR):
         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
 
-    def recognize(self, image_crop: np.ndarray):
-        h, w = image_crop.shape[:2]
-        aspect_ratio = w / float(h) if h > 0 else 1.0
-        slices = [image_crop] if aspect_ratio > 2.5 else [image_crop[0:int(h*0.55), :], image_crop[int(h*0.45):h, :]]
+    def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
+        slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
         entries = []
         for s in slices:
             resized = cv2.resize(s, (128, 32)).astype(np.float32) / 255.0
             tensor = np.transpose(resized, (2, 0, 1))[np.newaxis, ...]
-            entries.append({'text': 'LINE', 'confidence': 0.90})
+            entries.append({'text': 'LINE', 'confidence': 0.90}) # to change 
         return entries
 
 
@@ -487,8 +724,8 @@ class LPRPipeline:
             x1, y1, x2, y2 = map(int, d['box'])
             h, w, _ = img.shape
             if is_lprnet:
-                pad_w = max(6, int((x2 - x1) * 0.08))
-                pad_h = max(4, int((y2 - y1) * 0.06))
+                pad_w = 2
+                pad_h = 2
             else:
                 pad_w = max(20, int((x2 - x1) * padding_percent))
                 pad_h = max(15, int((y2 - y1) * padding_percent))
@@ -500,6 +737,7 @@ class LPRPipeline:
             
             crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
             if crop.size > 0:
+                slice_prefix = f"{crop_identifier}_{idx+1}" if len(detections) > 1 else crop_identifier
                 final_crop = crop
                 crop_h, crop_w = crop.shape[:2]
                 blur_score = PlatePreprocessor.compute_blur_score(crop)
@@ -513,21 +751,21 @@ class LPRPipeline:
                         reason = f"low resolution ({crop_w}x{crop_h})" if is_low_res else f"sharpness {blur_score:.1f} < 150.0"
                         print(f"  [Adaptive Recovery] Plate needs enhancement ({reason}). Auto-applying stroke & resolution recovery...")
                         enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
-                        raw_text_results = self.ocr.recognize(enhanced_crop)
+                        raw_text_results = self.ocr.recognize(enhanced_crop, debug_prefix=slice_prefix)
                         final_crop = enhanced_crop
                         was_enhanced = True
                     else:
                         print(f"  [1st try - Fast Pass] Natural crop evaluated (size: {crop_w}x{crop_h}, sharpness: {blur_score:.1f})")
-                        raw_text_results = self.ocr.recognize(crop)
+                        raw_text_results = self.ocr.recognize(crop, debug_prefix=slice_prefix)
                 else:
                     # 2nd try: Explicit escalation or forced enhancement
                     if is_lprnet:
                         # LPRNet expects tightly bounded crops matching its 94x24 input geometry
-                        raw_text_results = self.ocr.recognize(crop)
+                        raw_text_results = self.ocr.recognize(crop, debug_prefix=slice_prefix)
                     else:
                         print(f"  [2nd try - Enhancement Pass] Applying adaptive image enhancement (sharpness: {blur_score:.1f})...")
                         enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
-                        raw_text_results = self.ocr.recognize(enhanced_crop)
+                        raw_text_results = self.ocr.recognize(enhanced_crop, debug_prefix=slice_prefix)
                         final_crop = enhanced_crop
                         was_enhanced = True
                     
@@ -599,7 +837,7 @@ class LPRPipeline:
         # Check if 1st try succeeded: confident detection + strictly valid syntax from natural crop
         first_try_ok = (
             bool(detections) and 
-            detections[0]['confidence'] >= 0.25 and 
+            detections[0]['confidence'] >= self.detector.confidence_threshold and 
             self._is_strictly_valid(ocr_results) and
             not force_second_try and
             not force_third_try
@@ -607,7 +845,7 @@ class LPRPipeline:
         
         # 2nd try: Adaptive enhancement pass on the existing crop
         # Triggered if 1st try detected a box (>= 0.25) but OCR syntax was invalid, or force_second_try is requested
-        if (not first_try_ok or force_second_try) and not force_third_try and detections and detections[0]['confidence'] >= 0.25 and self.enable_preprocessing:
+        if (not first_try_ok or force_second_try) and not force_third_try and detections and detections[0]['confidence'] >= self.detector.confidence_threshold and self.enable_preprocessing:
             reason = "Forced 2nd try requested" if force_second_try else "1st try unverified"
             print(f"  [2nd try - Adaptive Enhancement] {reason}. Running enhancement on existing crop...")
             ocr_start_enh = time.time()

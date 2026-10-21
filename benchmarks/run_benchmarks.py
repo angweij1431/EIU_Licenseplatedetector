@@ -39,7 +39,7 @@ if not os.path.exists(model_path):
     else:
         raise FileNotFoundError(f"Detector model not found: {model_path}. Please place exported weights in Models_yolo/.")
 
-detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
+detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.45)
 ocr = get_ocr_adapter(args.ocr)
 pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
 
