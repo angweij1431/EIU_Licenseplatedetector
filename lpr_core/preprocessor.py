@@ -47,3 +47,29 @@ class PlatePreprocessor:
         # Step 8: Convert back to 3-channel BGR format expected by PaddleOCR
         enhanced_bgr = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)
         return enhanced_bgr
+
+    @staticmethod
+    def mild_enhance_for_transformer(crop_bgr: np.ndarray) -> np.ndarray:
+        if crop_bgr is None or crop_bgr.size == 0:
+            return crop_bgr
+
+        # Step 1: Upscale small crops so strokes have enough pixel density - latest btw;
+        h, w = crop_bgr.shape[:2]
+        if w < 128 or h < 64: # these are given size by cct-xs
+            scale = max(128.0 / max(1, w), 64.0 / max(1, h))
+            crop_bgr = cv2.resize(crop_bgr, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+
+        # Step 2: Mild CLAHE for shadow and glare balancing (no border padding)
+        gray = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+        contrast = clahe.apply(gray)
+
+        # Step 3: Subtle morphological stroke reinforcement (2x2 kernel, 1 pass)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        thickened = cv2.erode(contrast, kernel, iterations=1)
+
+        # Step 4: Mild unsharp mask to crisp up edges without halo artifacts
+        blurred = cv2.GaussianBlur(thickened, (3, 3), 0)
+        sharpened = cv2.addWeighted(thickened, 1.3, blurred, -0.3, 0)
+
+        return cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)

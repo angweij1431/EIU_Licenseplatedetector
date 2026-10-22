@@ -611,30 +611,64 @@ class LPRNetAdapter(BaseOCR):
         return results if results else [{'text': '', 'confidence': 0.0}]
 
 
-# CCT-XS compact convolutional transformer adapter
+# CCT-XS compact convolutional transformer adapter (Fast Plate OCR)
 class CCTXSRecognizerAdapter(BaseOCR):
-    def __init__(self, model_path: str = "Models_ocr/cct_xs.onnx"):
-        self.model_path = model_path
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"CCT-XS model weights not found: {model_path}. Please place weights in Models_ocr/.")
-        import onnxruntime as ort
-        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
+    def __init__(self, model_path: str = "Models_ocr/cct_xs.onnx", config_path: str = "Models_ocr/cct_xs_plate_config.yaml"):
+        from fast_plate_ocr import LicensePlateRecognizer
+        if os.path.exists(model_path) and os.path.exists(config_path):
+            self.recognizer = LicensePlateRecognizer(
+                onnx_model_path=model_path,
+                plate_config_path=config_path,
+                device='cpu'
+            )
+        else:
+            self.recognizer = LicensePlateRecognizer(
+                hub_ocr_model='cct-xs-v2-global-model',
+                device='cpu'
+            )
 
     def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
-        slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
-        entries = []
-        for s in slices:
-            resized = cv2.resize(s, (128, 32)).astype(np.float32) / 255.0
-            tensor = np.transpose(resized, (2, 0, 1))[np.newaxis, ...]
-            entries.append({'text': 'LINE', 'confidence': 0.90}) # to change 
-        return entries
+        #  adding new fields.
+
+        if image_crop is None or image_crop.size == 0:
+            return [{'text': '', 'confidence': 0.0, 'min_confidence': 0.0, 'region': 'Unknown', 'region_prob':0.0}]
+
+        preds = self.recognizer.run(image_crop, return_confidence=True)
+        if not preds or not preds[0].plate:
+            return [{'text': '', 'confidence': 0.0, 'min_confidence': 0.0, 'region': 'Unknown', 'region_prob':0.0}]
+            
+
+        pred = preds[0]
+        plate_text = pred.plate
+        plate_len = len(plate_text)
+
+        # slice to each char
+        if pred.char_probs is not None and plate_len >0:
+            plate_char_probs = pred.char_probs[:plate_len]
+            mean_conf = float(np.mean(plate_char_probs))
+            min_conf = float(np.min(plate_char_probs))
+        else:
+            mean_conf=0.0
+            min_conf=0.0
+
+        region = getattr(pred, 'region', 'Unknown') or 'Unknown'
+        region_prob = float(getattr(pred, 'region_prob', 0.0) or 0.0)
+
+        return [{
+            'text':plate_text,
+            'confidence': round(mean_conf,4),
+            'min_confidence': round(min_conf,4),
+            'region': region,
+            'region_prob': round(region_prob,4)
+        }]
 
 
 # Modular OCR factory loader
-def get_ocr_adapter(name: str = "paddleocr", **kwargs) -> BaseOCR:
+def get_ocr_adapter(name: str = "cct_xs", **kwargs) -> BaseOCR:
     name_clean = name.lower().strip()
-    if name_clean in ["paddleocr", "paddle", "paddle_full", "full"]:
+    if name_clean in ["cct_xs", "cct", "fast_plate", "fast_plate_ocr"]:
+        return CCTXSRecognizerAdapter(**kwargs)
+    elif name_clean in ["paddleocr", "paddle", "paddle_full", "full"]:
         return PaddleOCRAdapter(mode="full", **kwargs)
     elif name_clean in ["paddle_no_dbnet", "no_dbnet", "rec_only"]:
         return PaddleOCRAdapter(mode="no_dbnet", **kwargs)
@@ -644,10 +678,8 @@ def get_ocr_adapter(name: str = "paddleocr", **kwargs) -> BaseOCR:
         return CRNNAdapter(**kwargs)
     elif name_clean in ["lprnet"]:
         return LPRNetAdapter(**kwargs)
-    elif name_clean in ["cct_xs", "cct"]:
-        return CCTXSRecognizerAdapter(**kwargs)
     else:
-        raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet, cct_xs")
+        raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: cct_xs, paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet")
 
 
 # Unified License Plate Recognition pipeline
@@ -719,13 +751,15 @@ class LPRPipeline:
         if not detections or img is None:
             return ocr_results, was_enhanced
             
-        is_lprnet = isinstance(self.ocr, LPRNetAdapter)
+        # is_lprnet = isinstance(self.ocr, LPRNetAdapter) # old deprecated lwk.
+        is_cct_xs = isinstance(self.ocr, CCTXSRecognizerAdapter)
+
         for idx, d in enumerate(detections):
             x1, y1, x2, y2 = map(int, d['box'])
             h, w, _ = img.shape
-            if is_lprnet:
-                pad_w = 2
-                pad_h = 2
+            if is_cct_xs: # i removed is_lprnet.
+                pad_w = max(3, min(12, int((x2 -x1) * 0.04))) # hard coded 4 pixel padding replaced w/ dynamic scale of boudning box.
+                pad_h = max(3, min(12, int((y2 -y1) * 0.04))) # find distance between two points x2-x1 and get 4% of that.  output is never less than 3.
             else:
                 pad_w = max(20, int((x2 - x1) * padding_percent))
                 pad_h = max(15, int((y2 - y1) * padding_percent))
@@ -747,7 +781,7 @@ class LPRPipeline:
                 is_blurry = (blur_score < 150.0) or is_low_res
                 
                 if not apply_enhancement:
-                    if is_blurry and self.enable_preprocessing and not is_lprnet:
+                    if is_blurry and self.enable_preprocessing and not (is_cct_xs): # removed is_lprnet
                         reason = f"low resolution ({crop_w}x{crop_h})" if is_low_res else f"sharpness {blur_score:.1f} < 150.0"
                         print(f"  [Adaptive Recovery] Plate needs enhancement ({reason}). Auto-applying stroke & resolution recovery...")
                         enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
@@ -759,11 +793,16 @@ class LPRPipeline:
                         raw_text_results = self.ocr.recognize(crop, debug_prefix=slice_prefix)
                 else:
                     # 2nd try: Explicit escalation or forced enhancement
-                    if is_lprnet:
+                    if is_cct_xs:
                         # LPRNet expects tightly bounded crops matching its 94x24 input geometry
-                        raw_text_results = self.ocr.recognize(crop, debug_prefix=slice_prefix)
+                        print(f"  [2nd try - Transformer Mild Enhancement] Applying mild sharpening and stroke recovery (sharpness: {blur_score:.1f})...")
+                        enhanced_crop = PlatePreprocessor.mild_enhance_for_transformer(crop.copy())
+
+                        raw_text_results = self.ocr.recognize(enhanced_crop, debug_prefix=slice_prefix) # part of 2nd try.
+                        final_crop=enhanced_crop
+                        was_enhanced = True
                     else:
-                        print(f"  [2nd try - Enhancement Pass] Applying adaptive image enhancement (sharpness: {blur_score:.1f})...")
+                        print(f" NOTE - is_cct_xs NOT detected; this is default send: [2nd try - Enhancement Pass] Applying adaptive image enhancement (sharpness: {blur_score:.1f})...") # ts is general.
                         enhanced_crop = PlatePreprocessor.enhance_for_ocr(crop.copy())
                         raw_text_results = self.ocr.recognize(enhanced_crop, debug_prefix=slice_prefix)
                         final_crop = enhanced_crop
@@ -834,11 +873,18 @@ class LPRPipeline:
         if was_enhanced:
             try_level = "2nd try"
         
-        # Check if 1st try succeeded: confident detection + strictly valid syntax from natural crop
+        # Check if 1st try succeeded: confident detection + strictly valid syntax + high character confidence.
+        # checking charcter confidence before deciding when to escalate.
+
+        ocr_conf = ocr_results[0].get('confidence', 0.0) if ocr_results else 0.0
+        ocr_min_conf = ocr_results[0].get('min_confidence', 0.0) if ocr_results else 0.0
+                
         first_try_ok = (
             bool(detections) and 
             detections[0]['confidence'] >= self.detector.confidence_threshold and 
-            self._is_strictly_valid(ocr_results) and
+            self._is_strictly_valid(ocr_results) and 
+            ocr_conf >= 0.70 and # considered first try only if ocr conf and min conf is above 70, 60 %.
+            ocr_min_conf >= 0.60 and
             not force_second_try and
             not force_third_try
         )
@@ -851,10 +897,14 @@ class LPRPipeline:
             ocr_start_enh = time.time()
             enh_results, _ = self._crop_and_ocr(img, detections, crop_identifier, padding_percent, apply_enhancement=True, target_dir=target_dir, model_tag=model_stem, save_crop=save_crops)
             ocr_latency_ms += (time.time() - ocr_start_enh) * 1000
-            if force_second_try or self._is_strictly_valid(enh_results) or len(enh_results) > len(ocr_results):
-                ocr_results = enh_results
-                try_level = "2nd try"
-                print(f"  [2nd try - Succeeded] Image enhancement executed | Conf: {detections[0]['confidence']:.2f}")
+
+            enh_conf = enh_results[0].get('confidence',0.0) if enh_results else 0.0
+            enh_valid = self._is_strictly_valid(enh_results)
+
+            if force_second_try or (enh_valid and enh_conf >= ocr_conf) or (enh_valid and not self._is_strictly_valid(ocr_results)):
+                ocr_results=enh_results
+                try_level="2nd try"
+                print(f'    [2nd try - succceded] enhancement improved OCR | Conf: {enh_conf*100:.1f}')
         elif not detections:
             print("  [2nd try] Skipped (no plate detected in 1st try to enhance).")
 

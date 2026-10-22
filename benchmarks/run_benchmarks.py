@@ -18,11 +18,11 @@ from lpr_engine import (
 from lpr_core.validator import VietnamPlateValidator
 
 # Parse command line argument for vehicle test image or directory path
-parser = argparse.ArgumentParser(description="Run LPR Pipeline Benchmark on an Image or Directory of Images")
+parser = argparse.ArgumentParser(description="Run cct-xs Pipeline Benchmark on an Image or Directory of Images")
 parser.add_argument("input_path", nargs="?", default=None, help="Path to input image or directory (default: test_images)")
 parser.add_argument("--image_path", default=None, help="Path to input image or directory (flag alternative)")
-parser.add_argument("--model", default="Models_yolo/best.onnx", help="Path to detector model (default: Models_yolo/best.onnx)")
-parser.add_argument("--ocr", default="paddleocr", help="OCR engine mode: paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet, cct_xs (default: paddleocr)")
+parser.add_argument("--model", default="Models_yolo/balanced_best_yolo11n.onnx", help="Path to detector model (default: Models_yolo/balanced_best_yolo11n.onnx)")
+parser.add_argument("--ocr", default="cct_xs", help="OCR engine mode: paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet, cct_xs (default: cct_xs)")
 parser.add_argument("--output_dir", default=None, help="Directory to save output annotated images (optional)")
 args = parser.parse_args()
 
@@ -75,6 +75,12 @@ for idx, img_path in enumerate(image_files):
     extracted_text = "NONE"
     is_valid = False
     raw_lines = []
+
+
+    ocr_conf =0.0
+    min_conf =0.0
+    region_str= "N/A"
+
     if summary['ocr_results']:
         raw_lines = [r['text'] for r in summary['ocr_results']]
         val_lines = [r['validated_text'] for r in summary['ocr_results']]
@@ -82,6 +88,17 @@ for idx, img_path in enumerate(image_files):
         final_val = VietnamPlateValidator.clean_and_correct(joined_text)
         extracted_text = final_val['text']
         is_valid = final_val['is_valid']
+
+
+        r0 = summary['ocr_results'][0]
+        ocr_conf = float(r0.get('confidence',0.0))
+        min_conf = float(r0.get('min_confidence',ocr_conf)) # fixed to get min_conf
+        reg_name = r0.get('region', '')
+        reg_prob = float(r0.get('region_prob', 0.0))
+        if reg_name and reg_prob > 0:
+            region_str = f"{reg_name} ({reg_prob*100:.1f}%)"
+        elif reg_name:
+            region_str = reg_name
         
     results_list.append({
         'image': os.path.basename(img_path),
@@ -90,17 +107,26 @@ for idx, img_path in enumerate(image_files):
         'boxes': len(summary['detections']),
         'plate': extracted_text,
         'valid': is_valid,
+        'ocr_conf': ocr_conf,
+        'min_conf': min_conf,
+        'region': region_str,
         'det_ms': summary['detection_latency_ms'],
         'ocr_ms': summary['ocr_latency_ms'],
         'raw': raw_lines
     })
 
 # Print aggregate summary report
-print("\nBenchmark Summary Report:")
-print(f"{'Image':<22} | {'Try Escalation':<20} | {'Resolution':<10} | {'Boxes':<5} | {'Plate':<12} | {'Valid':<6} | {'Det (ms)':<8} | {'OCR (ms)':<8}")
+print("\n" + "=" * 132)
+print("BENCHMARK SUMMARY REPORT (CCT-XS v2 Global)")
+print("=" * 132)
+print(f"{'Image':<22} | {'Try Level':<20} | {'Boxes':<5} | {'Plate':<11} | {'Valid':<5} | {'Mean Conf':<9} | {'Min Char':<8} | {'Region (Prob)':<18} | {'Det (ms)':<9} | {'OCR (ms)':<8}")
+print("-" * 132)
 for r in results_list:
     valid_str = "YES" if r['valid'] else "NO"
-    print(f"{r['image']:<22} | {r['try_level']:<20} | {r['resolution']:<10} | {r['boxes']:<5} | {r['plate']:<12} | {valid_str:<6} | {r['det_ms']:<8.1f} | {r['ocr_ms']:<8.1f}")
+    conf_str = f"{r['ocr_conf']*100:.1f}%" if r['ocr_conf'] > 0 else "-"
+    min_str = f"{r['min_conf']*100:.1f}%" if r['min_conf'] > 0 else "-"
+    print(f"{r['image']:<22} | {r['try_level']:<20} | {r['boxes']:<5} | {r['plate']:<11} | {valid_str:<5} | {conf_str:<9} | {min_str:<8} | {r['region']:<18} | {r['det_ms']:<9.1f} | {r['ocr_ms']:<8.1f}")
+print("-" * 132)
 
 # Compute aggregate evaluation metrics
 total_imgs = len(results_list)
@@ -137,15 +163,20 @@ if os.path.exists(summary_md_path):
     with open(summary_md_path, "r", encoding="utf-8") as f:
         content = f.read()
         
-    history_header = "\n## 7. Dynamic Evaluation History\n\n| Timestamp | Test Image | Try Level | Resolution | Boxes | Plate Text | Valid Format | Det (ms) | OCR (ms) |\n| :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: | :---: |\n"
-    if "## 7. Dynamic Evaluation History" not in content:
+    # history logger.
+    history_header = "\n\n## 8. Fast Plate OCR (CCT-XS) Evaluation History\n\n| Timestamp | Test Image | Try Level | Resolution | Boxes | Plate Text | Valid Format | Mean Conf | Min Char | Region (Prob) | Det (ms) | OCR (ms) |\n| :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: | :---: | :--- | :---: | :---: |\n"
+    if "## 8. Fast Plate OCR (CCT-XS) Evaluation History" not in content:
         content += history_header
         
     rows_to_add = ""
     for r in results_list:
         valid_icon = "YES" if r['valid'] else "NO"
-        rows_to_add += f"| {timestamp_str} | `{r['image']}` | {r['try_level']} | {r['resolution']} | {r['boxes']} | `{r['plate']}` | {valid_icon} | {r['det_ms']:.1f} | {r['ocr_ms']:.1f} |\n"
-        
+        conf_str = f"{r['ocr_conf']*100:.1f}%" if r['ocr_conf'] > 0 else "-"
+        min_str = f"{r['min_conf']*100:.1f}%" if r['min_conf'] > 0 else "-"
+        rows_to_add += f"| {timestamp_str} | `{r['image']}` | {r['try_level']} | {r['resolution']} | {r['boxes']} | `{r['plate']}` | {valid_icon} | {conf_str} | {min_str} | {r['region']} | {r['det_ms']:.1f} | {r['ocr_ms']:.1f} |\n"
+
+  
+  
     content += rows_to_add
     with open(summary_md_path, "w", encoding="utf-8") as f:
         f.write(content)

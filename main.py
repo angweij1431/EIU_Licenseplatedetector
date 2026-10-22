@@ -21,17 +21,30 @@ OUTPUTS_DIR = "Outputs"
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 # Initialize models once during startup to avoid reloading per request
-# Primary detector: fine-tuned license plate ONNX model (Models_yolo/best.onnx)
-model_path = "Models_yolo/best.onnx"
+# Primary detector and Fast Plate OCR initialization
+model_path = "Models_yolo/balanced_best_yolo11n.onnx"
 if not os.path.exists(model_path):
-    raise FileNotFoundError(f"ONNX model not found: {model_path}. Please place exported ONNX weights in Models_yolo/.")
-primary_detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.25)
+    model_path = "Models_yolo/best.onnx"
+primary_detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.45)
 
-ocr = PaddleOCRAdapter(lang='en')
+from lpr_engine import get_ocr_adapter
+ocr = get_ocr_adapter("cct_xs")
 pipeline = LPRPipeline(
     detector=primary_detector, 
-    ocr=ocr
+    ocr=ocr,
+    enable_preprocessing=False
 )
+
+# Registered campus vehicle database (maps student RFID card ID to authorized license plate)
+REGISTERED_VEHICLES = {
+    "STU_1001": "51G74372",
+    "STU_1002": "59D242069",
+    "STU_1003": "43D199999",
+    "STU_1004": "29H133979",
+    "STU_1005": "61H76854",
+    "STU_1006": "51G77777",
+    "STU_1007": "30A69770",
+}
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -143,8 +156,9 @@ def handle_rfid_card_tap(request: RFIDTapRequest):
     total_latency = (time.time() - start_time) * 1000
     pipe_try_level = pipeline_res.get('try_level', '1st try')
     
-    # Authorized card check (cards starting with STU_ represent registered student cards)
+    # Authorized card check
     is_authorized_card = request.rfid_card_id.startswith("STU_")
+    registered_plate = REGISTERED_VEHICLES.get(request.rfid_card_id)
     
     if not is_authorized_card:
         gate_status = "ACCESS_DENIED"
@@ -154,23 +168,33 @@ def handle_rfid_card_tap(request: RFIDTapRequest):
         flag_reason = "Unauthorized RFID card."
         print(f"SECURITY ALERT: Event {event_id} denied - Unauthorized Card '{request.rfid_card_id}'.")
     else:
-        # Check if strict syntax passed on 1st try or 2nd try
-        if is_valid_format and ocr_conf >= 0.50:
+        # Two-factor verification: match OCR text against student registered plate
+        if registered_plate and ocr_text != "NONE_RECOGNIZED":
+            match_res = VietnamPlateValidator.match_plate(ocr_text, registered_plate, max_distance=1)
+            if match_res['match']:
+                gate_status = "GATE_OPEN"
+                mode = pipe_try_level
+                try_level = pipe_try_level
+                audit_flag = False
+                flag_reason = None if match_res['match_type'] == 'exact' else f"Fuzzy match (distance: {match_res['distance']}) against registered plate {registered_plate}."
+                print(f"ACCESS GRANTED: Event {event_id} verified ({match_res['match_type']}) for vehicle {ocr_text}.")
+            else:
+                gate_status = "ACCESS_DENIED"
+                mode = "MISMATCH"
+                try_level = pipe_try_level
+                audit_flag = True
+                flag_reason = f"Vehicle mismatch: card registered to {registered_plate}, detected {ocr_text}."
+                print(f"SECURITY ALERT: Event {event_id} mismatch - Card '{request.rfid_card_id}' ({registered_plate}) vs detected '{ocr_text}'.")
+        elif is_valid_format and ocr_conf >= 0.50:
+            # Valid syntax detected for unregistered card or guest mode
             gate_status = "GATE_OPEN"
             mode = pipe_try_level
             try_level = pipe_try_level
             audit_flag = False
-            flag_reason = None
-        # 3rd try: Format similarity tolerance (e.g. 301-69730 has 87.5% format similarity with DDLDDDDD)
-        elif is_format_similar and ocr_conf >= 0.50:
-            gate_status = "GATE_OPEN"
-            mode = "3rd try"
-            try_level = "3rd try"
-            audit_flag = False
-            flag_reason = f"Verified via format similarity ({format_similarity*100:.1f}% template match)."
-            print(f"FORMAT MATCH: Event {event_id} verified via 3rd try format similarity ({format_similarity*100:.1f}%).")
-        # Fallback: Valid student card, but plate unverified or unreadable
+            flag_reason = "Valid plate syntax verified."
+            print(f"ACCESS GRANTED: Event {event_id} opened via valid syntax: {ocr_text}.")
         else:
+            # Fallback: Valid student card, but plate unverified or unreadable
             gate_status = "GATE_OPEN_FLAGGED"
             mode = "CARD_ONLY"
             try_level = "fallback"
