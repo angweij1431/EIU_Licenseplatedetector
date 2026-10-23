@@ -506,109 +506,115 @@ def deskew_and_slice_plate(image_crop: np.ndarray, debug_prefix: str = None, sav
 
     return [top_slice, bot_slice]
 
-# CRNN model adapter (Convolutional Recurrent Neural Network for scene and plate text)
-class CRNNAdapter(BaseOCR):
-    def __init__(self, model_path: str = "Models_ocr/crnn.onnx", 
-                 chars: str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-"):
-        self.model_path = model_path
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"CRNN model weights not found: {model_path}. Please place weights in Models_ocr/.")
-        import onnxruntime as ort
-        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        self.input_name = self.session.get_inputs()[0].name
-        self.chars = list(chars)
+# # CRNN model adapter (Convolutional Recurrent Neural Network for scene and plate text)
+# deprecated for now
+#  
+# 
+# 
+# 
+# 
+# class CRNNAdapter(BaseOCR):
+#     def __init__(self, model_path: str = "Models_ocr/crnn.onnx", 
+#                  chars: str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-"):
+#         self.model_path = model_path
+#         if not os.path.exists(model_path):
+#             raise FileNotFoundError(f"CRNN model weights not found: {model_path}. Please place weights in Models_ocr/.")
+#         import onnxruntime as ort
+#         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+#         self.input_name = self.session.get_inputs()[0].name
+#         self.chars = list(chars)
 
-    def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
-        if image_crop is None or image_crop.size == 0:
-            raise ValueError("Input image crop to CRNN is empty")
+#     def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
+#         if image_crop is None or image_crop.size == 0:
+#             raise ValueError("Input image crop to CRNN is empty")
         
-        # Standard CRNN input dimensions: 100x32 grayscale or RGB
-        slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
+#         # Standard CRNN input dimensions: 100x32 grayscale or RGB
+#         slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
         
-        results = []
-        for s in slices:
-            gray = cv2.cvtColor(s, cv2.COLOR_BGR2GRAY) if len(s.shape) == 3 else s
-            resized = cv2.resize(gray, (100, 32)).astype(np.float32)
-            normalized = (resized / 127.5) - 1.0
-            tensor = normalized[np.newaxis, np.newaxis, ...]
+#         results = []
+#         for s in slices:
+#             gray = cv2.cvtColor(s, cv2.COLOR_BGR2GRAY) if len(s.shape) == 3 else s
+#             resized = cv2.resize(gray, (100, 32)).astype(np.float32)
+#             normalized = (resized / 127.5) - 1.0
+#             tensor = normalized[np.newaxis, np.newaxis, ...]
             
-            logits = self.session.run(None, {self.input_name: tensor})[0]
-            if len(logits.shape) == 3:
-                logits_2d = logits[0] # (T, C)
-                exp_logits = np.exp(logits_2d - np.max(logits_2d, axis=-1, keepdims=True))
-                probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
-                preds = np.argmax(probs, axis=-1)
-                char_confs = []
-                decoded = []
-                prev = -1
-                for i, idx in enumerate(preds):
-                    if idx != 0 and idx != prev:
-                        if idx < len(self.chars):
-                            decoded.append(self.chars[idx])
-                            char_confs.append(float(probs[i, idx]))
-                    prev = idx
-                text = "".join(decoded)
-                mean_conf = float(np.mean(char_confs)) if char_confs else 0.0
-            else:
-                preds = np.argmax(logits, axis=1)
-                decoded = []
-                prev = -1
-                for idx in preds:
-                    if idx != 0 and idx != prev:
-                        if idx < len(self.chars):
-                            decoded.append(self.chars[idx])
-                    prev = idx
-                text = "".join(decoded)
-                mean_conf = 0.0
-            if text:
-                results.append({'text': text, 'confidence': round(mean_conf, 4)})
-        return results if results else [{'text': '', 'confidence': 0.0}]
+#             logits = self.session.run(None, {self.input_name: tensor})[0]
+#             if len(logits.shape) == 3:
+#                 logits_2d = logits[0] # (T, C)
+#                 exp_logits = np.exp(logits_2d - np.max(logits_2d, axis=-1, keepdims=True))
+#                 probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+#                 preds = np.argmax(probs, axis=-1)
+#                 char_confs = []
+#                 decoded = []
+#                 prev = -1
+#                 for i, idx in enumerate(preds):
+#                     if idx != 0 and idx != prev:
+#                         if idx < len(self.chars):
+#                             decoded.append(self.chars[idx])
+#                             char_confs.append(float(probs[i, idx]))
+#                     prev = idx
+#                 text = "".join(decoded)
+#                 mean_conf = float(np.mean(char_confs)) if char_confs else 0.0
+#             else:
+#                 preds = np.argmax(logits, axis=1)
+#                 decoded = []
+#                 prev = -1
+#                 for idx in preds:
+#                     if idx != 0 and idx != prev:
+#                         if idx < len(self.chars):
+#                             decoded.append(self.chars[idx])
+#                     prev = idx
+#                 text = "".join(decoded)
+#                 mean_conf = 0.0
+#             if text:
+#                 results.append({'text': text, 'confidence': round(mean_conf, 4)})
+#         return results if results else [{'text': '', 'confidence': 0.0}]
 
+# DEPRECATED lprnet adapter for now.
+# # LPRNet model adapter (lightweight spatial CNN for license plates)
+# class LPRNetAdapter(BaseOCR):
+#     def __init__(self, model_path: str = "Models_ocr/lprnet.onnx"):
+#         self.model_path = model_path
+#         if not os.path.exists(model_path):
+#             raise FileNotFoundError(f"LPRNet model weights not found: {model_path}.")
+#         import onnxruntime as ort
+#         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+#         self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
+#         self.chars = ['_'] + list("0123456789ABCDEFGHKLMNPRSTUVXYZ-") # CTC blank token at index 0 followed by 32 characters
 
-# LPRNet model adapter (lightweight spatial CNN for license plates)
-class LPRNetAdapter(BaseOCR):
-    def __init__(self, model_path: str = "Models_ocr/lprnet.onnx"):
-        self.model_path = model_path
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"LPRNet model weights not found: {model_path}.")
-        import onnxruntime as ort
-        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        self.input_name = self.session.get_inputs()[0].name # input tensor name software can feed data correctly
-        self.chars = ['_'] + list("0123456789ABCDEFGHKLMNPRSTUVXYZ-") # CTC blank token at index 0 followed by 32 characters
+#     def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
+#         if image_crop is None or image_crop.size == 0:
+#             raise ValueError("Input image crop to LPRNet is empty")
 
-    def recognize(self, image_crop: np.ndarray, debug_prefix: str = None):
-        if image_crop is None or image_crop.size == 0:
-            raise ValueError("Input image crop to LPRNet is empty")
+#         slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
 
-        slices = deskew_and_slice_plate(image_crop, debug_prefix=debug_prefix, save_debug=True)
+#         results = []
+#         for s in slices:
+#             if s.size == 0:
+#                 continue
+#             resized = cv2.resize(s, (94, 24)).astype(np.float32)
+#             normalized = (resized - 127.5) * 0.0078125
+#             tensor = np.transpose(normalized, (2, 0, 1))[np.newaxis, ...]
+#             logits = self.session.run(None, {self.input_name: tensor})[0]
+#             logits_2d = logits[0] # (num_classes, seq_len)
 
-        results = []
-        for s in slices:
-            if s.size == 0:
-                continue
-            resized = cv2.resize(s, (94, 24)).astype(np.float32)
-            normalized = (resized - 127.5) * 0.0078125
-            tensor = np.transpose(normalized, (2, 0, 1))[np.newaxis, ...]
-            logits = self.session.run(None, {self.input_name: tensor})[0]
-            logits_2d = logits[0] # (num_classes, seq_len)
+#             # Compute numerically stable softmax probabilities along class dimension
+#             exp_logits = np.exp(logits_2d - np.max(logits_2d, axis=0, keepdims=True))
+#             probs = exp_logits / np.sum(exp_logits, axis=0, keepdims=True)
 
-            # Compute numerically stable softmax probabilities along class dimension
-            exp_logits = np.exp(logits_2d - np.max(logits_2d, axis=0, keepdims=True))
-            probs = exp_logits / np.sum(exp_logits, axis=0, keepdims=True)
-
-            best_path = np.argmax(probs, axis=0)
-            decoded = []
-            char_confs = []
-            for i, idx in enumerate(best_path):
-                if idx != 0 and (i == 0 or idx != best_path[i - 1]):
-                    if idx < len(self.chars):
-                        decoded.append(self.chars[idx])
-                        char_confs.append(float(probs[idx, i]))
-            text = "".join(decoded)
-            if text:
-                mean_conf = float(np.mean(char_confs)) if char_confs else 0.0
-                results.append({'text': text, 'confidence': round(mean_conf, 4)})
-        return results if results else [{'text': '', 'confidence': 0.0}]
+#             best_path = np.argmax(probs, axis=0)
+#             decoded = []
+#             char_confs = []
+#             for i, idx in enumerate(best_path):
+#                 if idx != 0 and (i == 0 or idx != best_path[i - 1]):
+#                     if idx < len(self.chars):
+#                         decoded.append(self.chars[idx])
+#                         char_confs.append(float(probs[idx, i]))
+#             text = "".join(decoded)
+#             if text:
+#                 mean_conf = float(np.mean(char_confs)) if char_confs else 0.0
+#                 results.append({'text': text, 'confidence': round(mean_conf, 4)})
+#         return results if results else [{'text': '', 'confidence': 0.0}]
 
 
 # CCT-XS compact convolutional transformer adapter (Fast Plate OCR)
@@ -675,9 +681,11 @@ def get_ocr_adapter(name: str = "cct_xs", **kwargs) -> BaseOCR:
     elif name_clean in ["paddle_split", "split_lines", "split", "paddle_fast", "fast_split", "paddle_geometric", "geometric"]:
         return PaddleOCRAdapter(mode="split_lines", **kwargs)
     elif name_clean in ["crnn", "crnn_onnx"]:
-        return CRNNAdapter(**kwargs)
+        raise ValueError("crnn has been deprecated for now please use cct_xs for production or paddleocr for baseline")
+        # return CRNNAdapter(**kwargs)
     elif name_clean in ["lprnet"]:
-        return LPRNetAdapter(**kwargs)
+        raise ValueError("lprnet has been permanently deprecated (its buns for this case;) please use cct_xs for production or paddleocr for baseline")
+        # return LPRNetAdapter(**kwargs)
     else:
         raise ValueError(f"Unknown OCR adapter type: '{name}'. Supported: cct_xs, paddleocr, paddle_no_dbnet, paddle_split, crnn, lprnet")
 
@@ -733,11 +741,22 @@ class LPRPipeline:
             
         return detections
 
-    # Checks whether extracted OCR results strictly match Vietnamese plate syntax
+    # Checks whether extracted OCR results strictly match Vietnamese plate syntax and region
     @staticmethod
-    def _is_strictly_valid(ocr_results):
+    def _is_strictly_valid(ocr_results): 
         if not ocr_results:
             return False
+        
+        r0 = ocr_results[0]
+        reg_name = r0.get('region', 'Unknown') or 'Unknown'
+        reg_prob = float(r0.get('region_prob', 0.0) or 0.0)
+
+        if reg_name not in ['Vietnam', 'Unknown'] and reg_prob >= 0.50: # auto remv
+            return False
+
+        if reg_name != 'Vietnam' and reg_name != "Unknown": # THIS ONE removes all plate that is not vietnamese however if the model needs to track itnernational cars then we can adjust
+            return False
+
         if len(ocr_results) == 1:
             return ocr_results[0].get('is_valid', False)
         val_lines = [r['validated_text'] for r in ocr_results if r.get('validated_text')]
@@ -878,6 +897,12 @@ class LPRPipeline:
 
         ocr_conf = ocr_results[0].get('confidence', 0.0) if ocr_results else 0.0
         ocr_min_conf = ocr_results[0].get('min_confidence', 0.0) if ocr_results else 0.0
+        # check region
+        r0 = ocr_results[0] if ocr_results else {}
+        reg_name = r0.get('region', 'Unknown') or 'Unknown'
+        reg_prob = float(r0.get('region_prob', 0.0) or 0.0)
+        is_region_valid = (reg_name in ['Vietnam', 'Unknown'] or reg_prob < 0.50)
+
                 
         first_try_ok = (
             bool(detections) and 
@@ -885,6 +910,7 @@ class LPRPipeline:
             self._is_strictly_valid(ocr_results) and 
             ocr_conf >= 0.70 and # considered first try only if ocr conf and min conf is above 70, 60 %.
             ocr_min_conf >= 0.60 and
+            is_region_valid and
             not force_second_try and
             not force_third_try
         )
@@ -979,8 +1005,8 @@ class LPRPipeline:
             joined = "".join(val_lines)
             val_out = VietnamPlateValidator.clean_and_correct(joined)
             plate_str = val_out['text']
-            is_plate_valid = val_out['is_valid']
-
+            is_plate_valid = self._is_strictly_valid(ocr_results) # to not draw box around incorrect plates.
+ 
         # Determine run tag from filename (e.g. "Run #1", "Run #2")
         stem_out = os.path.splitext(os.path.basename(output_file_path))[0]
         orig_stem = os.path.splitext(annotated_base)[0]

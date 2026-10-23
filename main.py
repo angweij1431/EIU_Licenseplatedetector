@@ -169,6 +169,19 @@ def handle_rfid_card_tap(request: RFIDTapRequest):
         print(f"SECURITY ALERT: Event {event_id} denied - Unauthorized Card '{request.rfid_card_id}'.")
     else:
         # Two-factor verification: match OCR text against student registered plate
+        r0 = pipeline_res['ocr_results'][0] if pipeline_res['ocr_results'] else {}
+        reg_name = r0.get('region', 'Unknown') or 'Unknown'
+        reg_prob = float(r0.get('region_prob', 0.0) or 0.0)
+        is_foreign_plate = (reg_name not in ['Vietnam', 'Unknown'] and reg_prob >= 0.50)
+
+        if is_foreign_plate:
+            gate_status = "ACCESS_DENIED"
+            mode = "FOREIGN_PLATE_REJECTED"
+            try_level = pipe_try_level
+            audit_flag = True
+            flag_reason = f"Security flag: Foreign plate region detected ({reg_name} {reg_prob*100:.1f}%)."
+            print(f"ALERT: Event {event_id} rejected - Foreign region '{reg_name}' ({reg_prob*100:.1f}%).")
+
         if registered_plate and ocr_text != "NONE_RECOGNIZED":
             match_res = VietnamPlateValidator.match_plate(ocr_text, registered_plate, max_distance=1)
             if match_res['match']:

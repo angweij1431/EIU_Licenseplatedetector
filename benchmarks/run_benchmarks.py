@@ -69,42 +69,52 @@ for idx, img_path in enumerate(image_files):
         sort_by='front', 
         primary_only=True, 
         padding_percent=0.20,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        save_crops=True # to show crops and augmentations
     )
+
+
     
     extracted_text = "NONE"
     is_valid = False
     raw_lines = []
-
-
-    ocr_conf =0.0
-    min_conf =0.0
-    region_str= "N/A"
+    ocr_conf = 0.0
+    min_conf = 0.0
+    region_str = "N/A"
+    
+    # Extract bounding box detection confidence
+    box_conf = 0.0
+    if summary['detections']:
+        box_conf = float(summary['detections'][0]['confidence'])
 
     if summary['ocr_results']:
         raw_lines = [r['text'] for r in summary['ocr_results']]
         val_lines = [r['validated_text'] for r in summary['ocr_results']]
         joined_text = "".join(val_lines)
         final_val = VietnamPlateValidator.clean_and_correct(joined_text)
-        extracted_text = final_val['text']
-        is_valid = final_val['is_valid']
-
-
+        
         r0 = summary['ocr_results'][0]
-        ocr_conf = float(r0.get('confidence',0.0))
-        min_conf = float(r0.get('min_confidence',ocr_conf)) # fixed to get min_conf
+        ocr_conf = float(r0.get('confidence', 0.0))
+        min_conf = float(r0.get('min_confidence', ocr_conf))
         reg_name = r0.get('region', '')
         reg_prob = float(r0.get('region_prob', 0.0))
+        
         if reg_name and reg_prob > 0:
             region_str = f"{reg_name} ({reg_prob*100:.1f}%)"
         elif reg_name:
             region_str = reg_name
-        
+
+        # Strict validation: Vietnamese syntax AND Vietnam regional head
+        is_region_valid = (reg_name == 'Vietnam')
+        is_valid = bool(final_val['is_valid'] and is_region_valid)
+        extracted_text = final_val['text'] if is_valid else (f"{final_val['text']} (REJECTED)" if final_val['text'] else "NONE")
+
     results_list.append({
         'image': os.path.basename(img_path),
         'try_level': summary.get('try_level', '1st try'),
         'resolution': summary.get('resolution', '640px'),
         'boxes': len(summary['detections']),
+        'box_conf': box_conf, # added box conf
         'plate': extracted_text,
         'valid': is_valid,
         'ocr_conf': ocr_conf,
@@ -115,18 +125,19 @@ for idx, img_path in enumerate(image_files):
         'raw': raw_lines
     })
 
-# Print aggregate summary report
-print("\n" + "=" * 132)
+## Print aggregate summary report
+print("\n" + "=" * 144)
 print("BENCHMARK SUMMARY REPORT (CCT-XS v2 Global)")
-print("=" * 132)
-print(f"{'Image':<22} | {'Try Level':<20} | {'Boxes':<5} | {'Plate':<11} | {'Valid':<5} | {'Mean Conf':<9} | {'Min Char':<8} | {'Region (Prob)':<18} | {'Det (ms)':<9} | {'OCR (ms)':<8}")
-print("-" * 132)
+print("=" * 144)
+print(f"{'Image':<22} | {'Try Level':<20} | {'Boxes':<5} | {'Box Conf':<8} | {'Plate':<15} | {'Valid':<5} | {'Mean Conf':<9} | {'Min Char':<8} | {'Region (Prob)':<18} | {'Det (ms)':<9} | {'OCR (ms)':<8}")
+print("-" * 144)
 for r in results_list:
     valid_str = "YES" if r['valid'] else "NO"
+    box_conf_str = f"{r['box_conf']*100:.1f}%" if r['box_conf'] > 0 else "-"
     conf_str = f"{r['ocr_conf']*100:.1f}%" if r['ocr_conf'] > 0 else "-"
     min_str = f"{r['min_conf']*100:.1f}%" if r['min_conf'] > 0 else "-"
-    print(f"{r['image']:<22} | {r['try_level']:<20} | {r['boxes']:<5} | {r['plate']:<11} | {valid_str:<5} | {conf_str:<9} | {min_str:<8} | {r['region']:<18} | {r['det_ms']:<9.1f} | {r['ocr_ms']:<8.1f}")
-print("-" * 132)
+    print(f"{r['image']:<22} | {r['try_level']:<20} | {r['boxes']:<5} | {box_conf_str:<8} | {r['plate']:<15} | {valid_str:<5} | {conf_str:<9} | {min_str:<8} | {r['region']:<18} | {r['det_ms']:<9.1f} | {r['ocr_ms']:<8.1f}")
+print("-" * 144)
 
 # Compute aggregate evaluation metrics
 total_imgs = len(results_list)
@@ -164,16 +175,17 @@ if os.path.exists(summary_md_path):
         content = f.read()
         
     # history logger.
-    history_header = "\n\n## 8. Fast Plate OCR (CCT-XS) Evaluation History\n\n| Timestamp | Test Image | Try Level | Resolution | Boxes | Plate Text | Valid Format | Mean Conf | Min Char | Region (Prob) | Det (ms) | OCR (ms) |\n| :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: | :---: | :--- | :---: | :---: |\n"
+    history_header = "\n\n## 8. Fast Plate OCR (CCT-XS) Evaluation History\n\n| Timestamp | Test Image | Try Level | Resolution | Boxes | Box Conf | Plate Text | Valid Format | Mean Conf | Min Char | Region (Prob) | Det (ms) | OCR (ms) |\n| :--- | :--- | :---: | :---: | :---: | :---: | :--- | :---: | :---: | :---: | :--- | :---: | :---: |\n"
     if "## 8. Fast Plate OCR (CCT-XS) Evaluation History" not in content:
         content += history_header
         
     rows_to_add = ""
     for r in results_list:
         valid_icon = "YES" if r['valid'] else "NO"
+        box_conf_str = f"{r['box_conf']*100:.1f}%" if r['box_conf'] > 0 else "-"
         conf_str = f"{r['ocr_conf']*100:.1f}%" if r['ocr_conf'] > 0 else "-"
         min_str = f"{r['min_conf']*100:.1f}%" if r['min_conf'] > 0 else "-"
-        rows_to_add += f"| {timestamp_str} | `{r['image']}` | {r['try_level']} | {r['resolution']} | {r['boxes']} | `{r['plate']}` | {valid_icon} | {conf_str} | {min_str} | {r['region']} | {r['det_ms']:.1f} | {r['ocr_ms']:.1f} |\n"
+        rows_to_add += f"| {timestamp_str} | `{r['image']}` | {r['try_level']} | {r['resolution']} | {r['boxes']} | {box_conf_str} | `{r['plate']}` | {valid_icon} | {conf_str} | {min_str} | {r['region']} | {r['det_ms']:.1f} | {r['ocr_ms']:.1f} |\n"
 
   
   
