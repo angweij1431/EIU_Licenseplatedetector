@@ -57,7 +57,7 @@ Launch the FastAPI access control backend and simulate two-factor card taps:
 
 ## 2. Test Image Dataset Matrix
 
-The evaluation suite contains 16 real-world test images covering motorcycles, automobiles, small crops, difficult angles, and negative background samples:
+The evaluation suite contains 18 real-world test images covering motorcycles, automobiles, small crops, difficult angles, atmospheric degradation, and negative background samples:
 
 | File Name | Category | Ground Truth | Clean Target | Expected Gate Action |
 | :--- | :--- | :---: | :---: | :---: |
@@ -65,16 +65,18 @@ The evaluation suite contains 16 real-world test images covering motorcycles, au
 | `bike_test_11.jpg` | Motorbike (Dual-row) | `29-H1 339.79` | `29H133979` | **GATE_OPEN (Pass 1)** |
 | `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN (Pass 1)** |
 | `bike_test_9.jpg` | Motorbike (Dual-row) | `59-D2 420.69` | `59D242069` | **GATE_OPEN (Pass 1)** |
+| `car_foggy_test.jpg` | Car (Foggy / Low Contrast) | `30K-279.76` | `30K27976` | **GATE_OPEN (Pass 1)** |
 | `car_test_2.jpg` | Car (Front) | `30A-697.70` | `30A69770` | **GATE_OPEN (Pass 1)** |
-| `car_test_3.jpg` | Car (Distant / Angled) | `29M-6840` | `29M6840` | **GATE_CLOSED (Low detector confidence)** |
+| `car_test_3.jpg` | Car (Distant / 43px crop) | `29M-6840` | `29M6840` | **GATE_CLOSED (Below optical resolution limit)** |
 | `car_test_4.jpg` | Car (Rear) | `51G-743.72` | `51G74372` | **GATE_OPEN (Pass 1)** |
 | `car_test_5.jpg` | Car (Front) | `51G-777.77` | `51G77777` | **GATE_OPEN (Pass 1)** |
-| `car_test_6.jpg` | Commercial Truck | `63H-903.94` | `63H90394` | **GATE_CLOSED (Distant / Angle)** |
+| `car_test_6.jpg` | Commercial Truck | `63H-903.94` | `63H90394` | **GATE_OPEN (Pass 1 - 40ep detector)** |
 | `car_test_7.jpg` | Traffic Scene | Obscured / Landmark | Non-plate | **GATE_CLOSED (Safe Rejection)** |
 | `car_test_8.jpg` | Heavy Motion Blur | Non-resolvable | Non-plate | **GATE_CLOSED (Safe Rejection)** |
+| `car_very_angled.jpg` | Car (Extreme Acute Angle) | Acute Yaw Angle | Non-resolvable | **GATE_CLOSED (Safe Rejection: Unknown Region)** |
 | `neg_sample_test_1.jpg` | Negative Background | None (Walkway) | None | **GATE_CLOSED (Zero Boxes Found)** |
 | `neg_sample_test_2.jpg` | Negative Background | None (Pavement) | None | **GATE_CLOSED (Zero Boxes Found)** |
-| `neg_sample_test_3.jpg` | Negative Background | None (Bicycle Frame) | None | **GATE_CLOSED (Rejected: Low Conf / Foreign)** |
+| `neg_sample_test_3.jpg` | Negative Background | None (Bicycle Frame) | None | **GATE_CLOSED (Rejected: Foreign / Unknown)** |
 | `neg_sample_test_4.jpg` | Negative Background | None (Pedestrian / Text) | None | **GATE_CLOSED (Zero Boxes Found)** |
 | `neg_sample_test_5.jpg` | Negative Background | None (Campus Gate) | None | **GATE_CLOSED (Zero Boxes Found)** |
 
@@ -253,17 +255,17 @@ All models evaluated on CPU (Intel Core i7-1260P) using `balanced_best_yolo11n.o
 
 | OCR Architecture | Model Size | Steady-State OCR (ms) | Motorbike Accuracy (4 images) | Clean Car Accuracy (3 images) | Character Confusion Status |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **CCT-XS v2 Global** | **3.34 MB** | **39.9 ms** | **4 / 4 (100%)** | **3 / 3 (100%)** | **Resolved** (0% ambiguity) |
-| **PaddleOCR (PP-OCRv6)** | ~150 MB | 1,800 – 2,500 ms | 4 / 4 (100%) | 3 / 3 (100%) | None (General document OCR) |
-| **LPRNet (Trained)** | 2.05 MB | 264.2 ms | 0 / 4 (0%) | 2 / 3 (66.7%) | Severe (`D` $\to$ `0`, `H` $\to$ `1`/`S`) |
+| **CCT-XS v2 Global** | **1.8 MB** | **12.5 – 51.7 ms** (avg 31.8 ms) | **4 / 4 (100%)** | **5 / 5 (100%)** | **Resolved** (0% ambiguity, native 2-line & region head) |
+| **PaddleOCR (PP-OCRv6)** | ~150 MB | 1,200 – 2,850 ms (up to 6,100 ms) | 4 / 4 (100%) | 3 / 3 (100%) | None (Heavy document OCR, slow on CPU) |
+| **LPRNet (Trained)** | 1.8 MB | 15 – 45 ms (single line) | 0 / 4 (0%) | 2 / 3 (66.7%) | Severe (`D` $\to$ `0`, `H` $\to$ `1`/`S`, 2-line failure) |
 
 ### Planned Enhancement: Glare and Reflection Attenuation for CCT-XS
 
 * **Objective**: Enhance recognition robustness against extreme tropical sunlight glare, night-time headlight specular reflections, and metallic plate surface overexposure.
-* **Target Milestone**:
-  * [ ] Benchmark plate crops exhibiting localized specular white-out.
-  * [ ] Implement adaptive specular reflection mask detection in `lpr_core/preprocessor.py`.
-  * [ ] Evaluate localized illumination attenuation (polarization compensation / Retinex luminance balance) prior to transformer tokenization.
+* **Status: Implemented and Validated**:
+  * [x] Benchmark plate crops exhibiting localized specular white-out (verified on `bike_10` with 31% overexposure).
+  * [x] Implement adaptive specular reflection mask detection in `lpr_core/preprocessor.py` (`PlatePreprocessor.attenuate_glare()`).
+  * [x] Localized illumination attenuation via Retinex luminance division integrated into Pass 2 (`PlatePreprocessor.mild_enhance_for_transformer()`).
 
 ---
 

@@ -763,3 +763,39 @@ updated benchmark tests for 15 oct with new test images incl neg samples and bic
 | 2026-10-23 09:23:10 | `neg_sample_test_3.jpg` | 3rd try | 1024px | 1 | 50.8% | `NONE` | NO | - | - | Unknown | 379.8 | 197.7 |
 | 2026-10-23 09:23:10 | `neg_sample_test_4.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 483.4 | 0.0 |
 | 2026-10-23 09:23:10 | `neg_sample_test_5.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 121.0 | 0.0 |
+| 2026-10-23 10:37:18 | `bike_test_10.jpg` | 1st try | 640px | 1 | 85.8% | `43D199999` | YES | 99.7% | 97.8% | Vietnam (100.0%) | 5191.5 | 172.5 |
+| 2026-10-23 10:37:18 | `bike_test_11.jpg` | 1st try | 640px | 1 | 86.8% | `29H133979` | YES | 100.0% | 99.9% | Vietnam (100.0%) | 523.1 | 49.8 |
+| 2026-10-23 10:37:18 | `bike_test_12.jpg` | 1st try | 640px | 1 | 84.7% | `61H76854` | YES | 99.4% | 95.5% | Vietnam (100.0%) | 349.6 | 31.6 |
+| 2026-10-23 10:37:18 | `bike_test_9.jpg` | 1st try | 640px | 1 | 88.8% | `59D242069` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 406.2 | 59.9 |
+| 2026-10-23 10:37:18 | `car_foggy_test.jpg` | 1st try | 640px | 1 | 59.4% | `30K27976` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 356.5 | 27.7 |
+| 2026-10-23 10:37:18 | `car_test_2.jpg` | 1st try | 640px | 1 | 74.6% | `30A69770` | YES | 99.9% | 99.7% | Vietnam (100.0%) | 385.6 | 61.4 |
+| 2026-10-23 10:37:18 | `car_test_3.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 801.6 | 0.0 |
+| 2026-10-23 10:37:18 | `car_test_4.jpg` | 1st try | 640px | 1 | 76.7% | `51G74372` | YES | 100.0% | 99.9% | Vietnam (100.0%) | 95.3 | 29.7 |
+| 2026-10-23 10:37:18 | `car_test_5.jpg` | 1st try | 640px | 1 | 76.3% | `51G77777` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 573.8 | 66.9 |
+| 2026-10-23 10:37:18 | `car_test_6.jpg` | 1st try | 640px | 1 | 79.9% | `63H90394` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 432.8 | 49.8 |
+| 2026-10-23 10:37:18 | `car_test_7.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 514.1 | 0.0 |
+| 2026-10-23 10:37:18 | `car_test_8.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 142.8 | 0.0 |
+| 2026-10-23 10:37:18 | `car_very_angled.jpg` | 3rd try | 1024px | 1 | 48.3% | `T (REJECTED)` | NO | 80.1% | 80.1% | Unknown (99.8%) | 610.8 | 295.0 |
+| 2026-10-23 10:37:18 | `neg_sample_test_1.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 630.0 | 0.0 |
+| 2026-10-23 10:37:18 | `neg_sample_test_2.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 181.2 | 0.0 |
+| 2026-10-23 10:37:18 | `neg_sample_test_3.jpg` | 3rd try | 1024px | 1 | 50.8% | `NONE` | NO | - | - | Unknown | 729.1 | 186.8 |
+| 2026-10-23 10:37:18 | `neg_sample_test_4.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 403.9 | 0.0 |
+| 2026-10-23 10:37:18 | `neg_sample_test_5.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 213.9 | 0.0 |
+| 2026-10-23 10:40:17 | `bike_test_10.jpg` | 1st try | 640px | 1 | 85.8% | `43D199999` | YES | 99.7% | 97.8% | Vietnam (100.0%) | 3733.0 | 18.0 |
+| 2026-10-23 10:40:17 | `bike_test_11.jpg` | 1st try | 640px | 1 | 86.8% | `29H133979` | YES | 100.0% | 99.9% | Vietnam (100.0%) | 525.9 | 40.1 |
+| 2026-10-23 10:40:17 | `bike_test_12.jpg` | 1st try | 640px | 1 | 84.7% | `61H76854` | YES | 99.4% | 95.5% | Vietnam (100.0%) | 610.3 | 38.2 |
+| 2026-10-23 10:40:17 | `bike_test_9.jpg` | 1st try | 640px | 1 | 88.8% | `59D242069` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 421.1 | 12.5 |
+| 2026-10-23 10:40:17 | `car_foggy_test.jpg` | 1st try | 640px | 1 | 59.4% | `30K27976` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 459.5 | 35.9 |
+| 2026-10-23 10:40:17 | `car_test_2.jpg` | 1st try | 640px | 1 | 74.6% | `30A69770` | YES | 99.9% | 99.7% | Vietnam (100.0%) | 358.0 | 12.5 |
+| 2026-10-23 10:40:17 | `car_test_3.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 862.5 | 0.0 |
+| 2026-10-23 10:40:17 | `car_test_4.jpg` | 1st try | 640px | 1 | 76.7% | `51G74372` | YES | 100.0% | 99.9% | Vietnam (100.0%) | 98.8 | 45.5 |
+| 2026-10-23 10:40:17 | `car_test_5.jpg` | 1st try | 640px | 1 | 76.3% | `51G77777` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 710.8 | 51.7 |
+| 2026-10-23 10:40:17 | `car_test_6.jpg` | 1st try | 640px | 1 | 79.9% | `63H90394` | YES | 100.0% | 100.0% | Vietnam (100.0%) | 918.2 | 31.7 |
+| 2026-10-23 10:40:17 | `car_test_7.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 851.0 | 0.0 |
+| 2026-10-23 10:40:17 | `car_test_8.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 227.7 | 0.0 |
+| 2026-10-23 10:40:17 | `car_very_angled.jpg` | 3rd try | 1024px | 1 | 48.3% | `T (REJECTED)` | NO | 80.1% | 80.1% | Unknown (99.8%) | 590.1 | 147.8 |
+| 2026-10-23 10:40:17 | `neg_sample_test_1.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 712.6 | 0.0 |
+| 2026-10-23 10:40:17 | `neg_sample_test_2.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 311.0 | 0.0 |
+| 2026-10-23 10:40:17 | `neg_sample_test_3.jpg` | 3rd try | 1024px | 1 | 50.8% | `NONE` | NO | - | - | Unknown | 550.1 | 62.1 |
+| 2026-10-23 10:40:17 | `neg_sample_test_4.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 869.3 | 0.0 |
+| 2026-10-23 10:40:17 | `neg_sample_test_5.jpg` | 3rd try (exhausted) | 1024px | 0 | - | `NONE` | NO | - | - | N/A | 390.1 | 0.0 |

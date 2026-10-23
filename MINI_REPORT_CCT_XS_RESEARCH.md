@@ -63,7 +63,7 @@ To maintain empirical accuracy, the latency metrics below are calculated **stric
 | **Model Size on Disk** | ~150 MB (Dual weights) | 1.8 MB (`.onnx`) | 1.8 MB (`.onnx`) |
 | **Active Memory (RAM)** | 1,800 MB - 2,500 MB | ~65 MB | ~80 MB |
 | **Cold-Start OCR Latency (CPU)** | 2,400 ms - 3,200 ms | 45 ms - 70 ms | **55 ms - 80 ms** |
-| **Steady-State OCR Latency (Per Plate)** | 1,200 ms - 2,850 ms (Single Pass)<br>4,000 ms - 6,100 ms (Dual Pass) | 15 ms - 45 ms (Single Row Only) | **30 ms - 55 ms (End-to-End Crop)**<br>*(Pure model forward pass: 10 ms - 20 ms)* |
+| **Steady-State OCR Latency (Per Plate)** | 1,200 ms - 2,850 ms (Single Pass)<br>4,000 ms - 6,100 ms (Dual Pass) | 15 ms - 45 ms (Single Row Only) | **12.5 ms - 51.7 ms (End-to-End Crop, avg 31.8 ms)**<br>*(Pure model forward pass: 10 ms - 20 ms)* |
 | **Dual-Row Plate Handling** | Requires DBNet or Geometric Slicing | Requires Geometric Slicing (Fails often) | **Native End-to-End (Zero Slicing)** |
 | **Character Token Confidence** | Sequence-level heuristic average | CTC softmax path product | **Per-character softmax probabilities** |
 | **Country / Region Head** | None | None | **Built-in multi-class regional classifier** |
@@ -368,7 +368,7 @@ The pipeline is benchmarked and validated on the following host environment:
 
 ## 7. Camera Architecture and Deployment Constraints
 
-### Analysis of Edge Cases
+### Analysis of Edge Cases (18-Image Benchmark Suite)
 1. **Resolution Failure on `car_test_3.jpg`**:
    * The plate bounding box in `car_test_3.jpg` occupies only $43.1 \times 30.5$ pixels in a $1024 \times 602$ wide-angle frame.
    * Detector confidence was 0.264 (below the 0.45 operational threshold).
@@ -376,6 +376,13 @@ The pipeline is benchmarked and validated on the following host environment:
 2. **Success on `car_test_6.jpg` with 40-Epoch Detector**:
    * Previously missed by the 25-epoch baseline at 640px resolution.
    * The newly trained `balanced_40eps_yolo11n.onnx` successfully detects the plate at 640px in Pass 1 with 79.9% confidence. CCT-XS recognized the plate as `63H90394` with 99.99% confidence and 1.0 Vietnam region probability.
+3. **Low-Contrast Fog Handling on `car_foggy_test.jpg`**:
+   * Subjected to atmospheric diffusion and lowered contrast.
+   * Detected in Pass 1 (640px) at 59.4% bounding box confidence. CCT-XS resolved the plate cleanly as `30K27976` with 100.0% character confidence and 1.0 Vietnam region probability in 35.9 ms without requiring secondary enhancement.
+4. **Acute Perspective Safeguard on `car_very_angled.jpg`**:
+   * Photographed at an extreme oblique horizontal yaw angle (> 60 degrees).
+   * The detector escalated to Pass 3 (1024px), finding a candidate box at 48.3% confidence. However, severe geometric foreshortening collapsed character tokens, resulting in `T (REJECTED)` and an `Unknown (99.8%)` regional prediction.
+   * The strict validation gate safely blocked barrier access (`Valid: NO`), preventing false gate triggers on unresolvable vehicle angles.
 
 ### Recommendations for EIU Boom Barrier Camera Setup
 To guarantee 100% operational reliability at campus access gates, physical camera positioning must satisfy the following optical constraints:
