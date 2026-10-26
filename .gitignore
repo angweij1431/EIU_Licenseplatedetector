@@ -11,6 +11,9 @@ env/
 *.engine
 *.pth
 # Models_yolo/
+!Models_ocr/cct_xs.onnx
+!Models_yolo/balanced_40eps_yolo11n.onnx
+!Models_yolo/balanced_skew_robust_yolo11n.onnx
 
 # Python Cache & Outputs
 __pycache__/
