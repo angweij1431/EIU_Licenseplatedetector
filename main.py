@@ -24,7 +24,7 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 # Primary detector and Fast Plate OCR initialization
 model_path = "Models_yolo/balanced_40eps_yolo11n.onnx"
 
-primary_detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.45)
+primary_detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.20) # edited confidence score as of 4:13pm
 
 ocr = get_ocr_adapter("cct_xs")
 pipeline = LPRPipeline(
