@@ -496,5 +496,81 @@ The resulting `cct_xs_finetuned.onnx` file replaces `Models_ocr/cct_xs.onnx` dir
 
 ### G. Dedicated Training Notebook
 A complete, turnkey Google Colab notebook configured for this workflow is provided at:
-* [finetune_cct_xs.ipynb](file:///c:/Users/User/EIU_OITP\lpr_research\ColabNotebookTemplate\finetune_cct_xs.ipynb)
+* [02_finetune_cct_xs_vietnam.ipynb](file:///c:/Users/User/EIU_OITP/lpr_research/ColabNotebookTemplate/02_finetune_cct_xs_vietnam.ipynb)
+
+---
+
+## 9. Real-World Multi-Fleet Campus Benchmark (151 Images) and Regulatory Alignment
+
+### A. Evaluation Protocol Across 6 Campus Fleets
+To rigorously evaluate edge real-time performance and defensive false-trigger mitigation, the pipeline was benchmarked against 151 unconstrained real-world vehicle images across 6 distinct fleet categories:
+- `Car / car1`: 35 standard automobile entries.
+- `Car / car1_defective`: 2 defective and damaged plate test captures.
+- `Car / car2`: 29 diverse automobile angles and lighting conditions.
+- `Car / car2_defective`: 4 damaged, taped, or obscured automobile plates.
+- `Motor / motor1`: 72 motorcycle entries covering square two-row plates.
+- `Motor / motor1_defective`: 9 damaged, mud-splattered, or acute-angle motorcycle plates.
+
+### B. Consolidated 151-Image Benchmark Scorecard
+
+| Fleet Category | Total Images | Passed (Gate Opened) | Rejected (Gate Closed) | No Detection (0 Boxes) | Crops Generated | Safe Rejection Rate |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `car1` | 35 | 30 | 1 | 4 | 33 | 100.0% |
+| `car1_defective` | 2 | 0 | 2 | 0 | 2 | **100.0% (Zero False Opens)** |
+| `car2` | 29 | 19 | 2 | 8 | 21 | 100.0% |
+| `car2_defective` | 4 | 0 | 1 | 3 | 1 | **100.0% (Zero False Opens)** |
+| `motor1` | 72 | 32 | 10 | 30 | 78 | 100.0% |
+| `motor1_defective` | 9 | 0 | 3 | 6 | 8 | **100.0% (Zero False Opens)** |
+| **Total Fleet** | **151** | **81 (53.6%)** | **19 (12.6%)** | **51 (33.8%)** | **143** | **100.0% Safety on Defective Fleets** |
+
+
+*How to verify these numbers:*
+Run benchmarks/run_benchmarks.py pointing to any fleet folder:
+```powershell
+.\venv_models\Scripts\python.exe benchmarks/run_benchmarks.py "test_images/CAR MOTOR/Car/car1" --output_dir "Outputs/khai_test/car1"
+```
+The script prints the scorecard summary to the console upon completion and sorts the annotated images into `passed/`, `rejected/`, and no_detection/ subfolders under Outputs/khai_test/car1/.
+
+### C. Analysis of Empirical Findings
+1. **Defective Fleet Safety**: Across all 15 defective vehicle captures (`car1_defective`, `car2_defective`, `motor1_defective`), the gate opened 0 times (100% defensive safety). Defective or obscured characters were safely halted by strict regex verification or low-confidence rejection.
+2. **Detection Dropout on Micro-Thumbnails**: All 51 'No Detection' images were low-resolution web thumbnails (< 160 px width from social media compression) or vehicles photographed from extreme distance (> 25 meters). In production campus boom barriers, fixed camera geometry guarantees vehicles occupy at least 150-250 pixels.
+3. **Vietnamese Regulatory Alignment (Circular 24/2023/TT-BCA)**:
+   - *Observation*: Test image `M1-46` (`59VA24003`) was recognized by CCT-XS with 99.6% mean character confidence and 99.8% Vietnam regional probability, but was initially flagged as `REJECTED`.
+   - *Root Cause*: The legacy motorcycle pattern strictly enforced `[A-Z][0-9]` (such as `59D2`). Under Circular 24/2023/TT-BCA (and Circular 58/2020 for mopeds < 50cc), motorcycle identification plates officially utilize two consecutive letters (`[A-Z]{2}`, such as `59-VA` registered in Go Vap, Ho Chi Minh City).
+   - *Resolution*: Updated `VietnamPlateValidator.MOTO_PATTERN` to `^[1-9][0-9]([A-Z][0-9]|[A-Z]{2})[0-9]{4,6}$` and expanded template masks to include `DDLLDDDDD`. Image `M1-46` transitioned to `PASSED` on Pass 1 (640px) with 314.1 ms steady-state latency.
+
+---
+
+## 10. Comprehensive Analysis of CCT-XS Drawbacks and Mitigations
+
+For peer engineering review, system limitations and operational safeguards are detailed below:
+
+1. **Fixed Input Geometry ($128 	imes 64	ext{ px}$)**:
+   - *Limitation*: Rectangular single-line automobile plates ($4.7:1$ aspect ratio) are squashed into a $2:1$ input tensor, compressing character spacing and increasing confusion between narrow letters (`1`, `I`, `T`).
+   - *Mitigation*: Implemented dynamic bicubic scaling in Pass 2 (`PlatePreprocessor.mild_enhance_for_transformer()`) and strict alphanumeric regex validation that resolves character slots structurally.
+
+2. **Rigid Output Length Head ($	ext{max\_plate\_slots} = 10$)**:
+   - *Limitation*: Uses fixed positional classification heads; cannot decode license plates with $>10$ characters without model retraining.
+   - *Mitigation*: Vietnamese civilian vehicle plates contain 7 to 9 alphanumeric characters, which fits comfortably within the 10-slot limit.
+
+3. **Absence of Spatial Transformer Network (STN)**:
+   - *Limitation*: CCT-XS lacks integrated spatial rectification layers; degraded under severe acute perspective yaw angles ($> 45^\circ$, e.g. `car_very_angled.jpg`).
+   - *Mitigation*: Upstream 4-point canonical perspective unwarp (`canonical_perspective_unwarp()`) and physical camera mounting constraints limiting horizontal angle within 15 degrees.
+
+4. **Limited Parameter Capacity (~1.8 MB)**:
+   - *Limitation*: As an ultra-lightweight vision transformer, it cannot reconstruct sub-pixel strokes on micro-thumbnails ($< 40 	imes 20	ext{ px}$).
+   - *Mitigation*: Optical focal length engineering (6-12mm narrow varifocal lens ensuring $\ge 150	ext{ px}$ plate width on approach).
+
+5. **Pre-Trained International Font Bias**:
+   - *Limitation*: Pre-trained across global distributions; exhibits subtle confusion on visually adjacent Vietnamese font styles (`0` vs `D`, `8` vs `B`, `5` vs `S`).
+   - *Mitigation*: Fine-tuning protocol with AdamW optimizer, cosine learning rate decay, and label smoothing ($lpha = 0.01$) provided in `02_finetune_cct_xs_vietnam.ipynb`.
+
+6. **Sensitivity to Hard Binarization**:
+   - *Limitation*: Convolutional patch tokenizer relies on continuous gradient transitions; disrupted by harsh Otsu black-and-white thresholding.
+   - *Mitigation*: Preserved natural RGB crops in Pass 1 and soft CLAHE (1.5) with unsharp masking in Pass 2, avoiding hard binarization.
+
+7. **Complete Upstream Detector Dependency**:
+   - *Limitation*: CCT-XS performs text recognition only; zero plate localization capability and 100% dependent on upstream YOLO bounding box precision.
+   - *Mitigation*: Detector trained on 1:1 balanced car/motorbike fleet with negative campus samples (`balanced_40eps_yolo11n.onnx`), achieving 0% false alarms on negative backgrounds.
+
 

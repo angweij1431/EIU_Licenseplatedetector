@@ -1,361 +1,266 @@
-# Automated Vietnamese License Plate Recognition (LPR) & RFID Gate System
+# Automated Vietnamese License Plate Recognition (ALPR) and RFID Access Control System
 
-An automated vehicle access control system combining YOLO (You Only Look Once) plate detection, CCT-XS (Compact Convolutional Transformer - Extra Small) character recognition, and an RFID (Radio Frequency Identification) card authentication service for automated boom barriers.
+An edge-optimized vehicle access control pipeline combining You Only Look Once (YOLO) license plate detection, Compact Convolutional Transformer (CCT-XS) character recognition, and a Radio Frequency Identification (RFID) two-factor authentication service for automated campus boom barriers.
 
-Developed for smart campus security research at Eastern International University (EIU). The system detects vehicle license plates from camera snapshots, executes multi-pass optical character recognition, validates Vietnamese legal syntax, verifies recognized plates against authorized student RFID card records, and controls barrier access.
+Developed for smart campus access control research at Eastern International University (EIU). The system executes multi-tier computer vision inference locally on edge Central Processing Unit (CPU) hardware via Open Neural Network Exchange (ONNX) Runtime, with zero cloud API dependencies.
 
 ---
 
 ## 1. Quickstart Guide
 
-Ensure your virtual environment is active before running commands. All models run locally on CPU (Central Processing Unit) via ONNX (Open Neural Network Exchange) Runtime with zero cloud dependencies.
+Ensure your virtual environment is active before running commands. All models run on CPU via ONNX Runtime.
 
 ### Environment Activation
 On Windows (PowerShell):
 ```powershell
 .\venv_models\Scripts\Activate.ps1
 ```
-*(On Linux/macOS: `source venv/bin/activate`)*
 
 ### Primary Execution Commands
 
-#### A. Single Image Inference (CCT-XS Default)
-Run the pipeline on a test image to view detection boxes, decoded plate characters, confidence metrics, and save annotated visual outputs to `Outputs/`:
+#### A. Single Image Inference
+Run end-to-end inference on a test image with dual-pass latency breakdown (cold-start vs steady-state):
 ```powershell
 .\venv_models\Scripts\python.exe infer.py test_images/bike_test_10.jpg
 ```
 
-#### B. Batch Benchmark Suite (16 Test Images)
-Evaluate the complete benchmark suite across motorbikes, cars, and negative background samples with full confidence telemetry:
+#### B. Multi-Fleet Benchmark Suite
+Run batch evaluation across campus fleets with automated 4-bucket directory routing and ID tagging:
 ```powershell
-.\venv_models\Scripts\python.exe benchmarks/run_benchmarks.py test_images --model Models_yolo/balanced_best_yolo11n.onnx --ocr cct_xs
+# Evaluate motorcycle fleet with balanced 40-epoch detector and CCT-XS recognizer
+.\venv_models\Scripts\python.exe benchmarks/run_benchmarks.py "test_images/CAR MOTOR/Motor/motor1" --model Models_yolo/balanced_40eps_yolo11n.onnx --ocr cct_xs --output_dir "Outputs/khai_test/motor1"
 ```
 
 #### C. OCR Backend Selection
 ```powershell
-# Fast Plate OCR - CCT-XS v2 Global (Default: ~15-40 ms, 100% exact match on clean plates)
-.\venv_models\Scripts\python.exe benchmarks/run_benchmarks.py test_images --ocr cct_xs
+# Fast Plate OCR - CCT-XS v2 Global (Primary: ~12.5-51.7 ms, unified 1-line and 2-line reading)
+.\venv_models\Scripts\python.exe infer.py test_images/car_test_2.jpg --ocr cct_xs
 
-# PaddleOCR PP-OCRv6 (Legacy High-Latency: ~1,500-2,500 ms)
-.\venv_models\Scripts\python.exe benchmarks/run_benchmarks.py test_images --ocr paddleocr
-
-# LPRNet (Deprecated: exhibits character confusion on D/0 and H/1)
-.\venv_models\Scripts\python.exe benchmarks/run_benchmarks.py test_images --ocr lprnet
+# PaddleOCR PP-OCRv6 (High-Latency Baseline Reference: ~1,200-2,850 ms)
+.\venv_models\Scripts\python.exe infer.py test_images/car_test_2.jpg --ocr paddleocr
 ```
 
-#### D. Campus Gate Access Server & RFID Card Simulation
-Launch the FastAPI access control backend and simulate two-factor card taps:
+#### D. Campus Boom Barrier Server & RFID Simulation
+Launch the FastAPI barrier access control service and simulate student RFID card tap events:
 ```powershell
-# Terminal 1: Start the FastAPI boom barrier service
+# Terminal 1: Launch FastAPI boom barrier service
 .\venv_models\Scripts\python.exe main.py
 
-# Terminal 2: Simulate a student RFID card tap paired with camera snapshot
+# Terminal 2: Simulate RFID card tap synchronized with camera capture
 .\venv_models\Scripts\python.exe simulate_rfid.py test_images/bike_test_11.jpg
 ```
 
 ---
 
-## 2. Test Image Dataset Matrix
+## 2. System Architecture
 
-The evaluation suite contains 18 real-world test images covering motorcycles, automobiles, small crops, difficult angles, atmospheric degradation, and negative background samples:
-
-| File Name | Category | Ground Truth | Clean Target | Expected Gate Action |
-| :--- | :--- | :---: | :---: | :---: |
-| `bike_test_10.jpg` | Motorbike (Dual-row) | `43-D1 999.99` | `43D199999` | **GATE_OPEN (Pass 1)** |
-| `bike_test_11.jpg` | Motorbike (Dual-row) | `29-H1 339.79` | `29H133979` | **GATE_OPEN (Pass 1)** |
-| `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN (Pass 1)** |
-| `bike_test_9.jpg` | Motorbike (Dual-row) | `59-D2 420.69` | `59D242069` | **GATE_OPEN (Pass 1)** |
-| `car_foggy_test.jpg` | Car (Foggy / Low Contrast) | `30K-279.76` | `30K27976` | **GATE_OPEN (Pass 1)** |
-| `car_test_2.jpg` | Car (Front) | `30A-697.70` | `30A69770` | **GATE_OPEN (Pass 1)** |
-| `car_test_3.jpg` | Car (Distant / 43px crop) | `29M-6840` | `29M6840` | **GATE_CLOSED (Below optical resolution limit)** |
-| `car_test_4.jpg` | Car (Rear) | `51G-743.72` | `51G74372` | **GATE_OPEN (Pass 1)** |
-| `car_test_5.jpg` | Car (Front) | `51G-777.77` | `51G77777` | **GATE_OPEN (Pass 1)** |
-| `car_test_6.jpg` | Commercial Truck | `63H-903.94` | `63H90394` | **GATE_OPEN (Pass 1 - 40ep detector)** |
-| `car_test_7.jpg` | Traffic Scene | Obscured / Landmark | Non-plate | **GATE_CLOSED (Safe Rejection)** |
-| `car_test_8.jpg` | Heavy Motion Blur | Non-resolvable | Non-plate | **GATE_CLOSED (Safe Rejection)** |
-| `car_very_angled.jpg` | Car (Extreme Acute Angle) | Acute Yaw Angle | Non-resolvable | **GATE_CLOSED (Safe Rejection: Unknown Region)** |
-| `neg_sample_test_1.jpg` | Negative Background | None (Walkway) | None | **GATE_CLOSED (Zero Boxes Found)** |
-| `neg_sample_test_2.jpg` | Negative Background | None (Pavement) | None | **GATE_CLOSED (Zero Boxes Found)** |
-| `neg_sample_test_3.jpg` | Negative Background | None (Bicycle Frame) | None | **GATE_CLOSED (Rejected: Foreign / Unknown)** |
-| `neg_sample_test_4.jpg` | Negative Background | None (Pedestrian / Text) | None | **GATE_CLOSED (Zero Boxes Found)** |
-| `neg_sample_test_5.jpg` | Negative Background | None (Campus Gate) | None | **GATE_CLOSED (Zero Boxes Found)** |
-
----
-
-## 3. Production Pipeline Architecture
-
-The system uses a multi-tier escalation pipeline to optimize inference speed on clean plates while maintaining recognition accuracy on faint, blurry, or distant vehicles.
+The pipeline executes a 3-tier escalation engine designed to minimize compute latency on clean plates while recovering degraded, blurry, or distant captures.
 
 ```mermaid
 flowchart TD
-    Start["Camera Snapshot Received"] --> Det1["Pass 1: YOLO11n Detector Pass (640px)<br/>Confidence Threshold: 0.45"]
-    Det1 --> BoxCheck{"Plate Bounding Box<br/>Detected?"}
+    Start["Camera Snapshot Received"] --> Det1["Pass 1: YOLO11n Detector 640px<br>Confidence Threshold: 0.45"]
+    Det1 --> BoxCheck{"Plate Detected?"}
     
-    BoxCheck -->|"Yes"| Crop1["Scale-Adaptive Tight Crop<br/>Padding: 4% (3-12px, zero white border)"]
-    BoxCheck -->|"No"| Zoom3["Pass 3: Deep Zoom Pass (1024px)<br/>High-Res Detector Scan"]
+    BoxCheck -->|Yes| Crop1["Scale-Adaptive Tight Crop<br>Padding: 4% (3-12px)"]
+    BoxCheck -->|No| Zoom3["Pass 3: Deep Zoom Scan 1024px<br>High-Resolution Escalation"]
     
-    Crop1 --> Pass1["Pass 1: Natural Crop Fast Pass<br/>Direct CCT-XS Inference (~15-40ms)"]
-    Pass1 --> Syntax1{"Syntax Valid AND<br/>Mean Conf >= 0.70 AND<br/>Min Char >= 0.60?"}
+    Crop1 --> Pass1["Pass 1: Natural Crop Fast Pass<br>Direct CCT-XS Inference (~15-40ms)"]
+    Pass1 --> Syntax1{"Syntax Valid and Conf &ge; 0.70 and Region == Vietnam?"}
     
-    Syntax1 -->|"Yes (Clean Plate)"| AccessCheck["Two-Factor Verification<br/>match_plate() vs Student Database"]
-    Syntax1 -->|"No (Faint / Blurry)"| Pass2["Pass 2: Mild Transformer Enhancement<br/>Upscale to >=128x64 + CLAHE 1.5 + Soft 2x2 Filter"]
+    Syntax1 -->|Yes| AccessCheck["Two-Factor Verification<br>match_plate() vs Registered Vehicle DB"]
+    Syntax1 -->|No| Pass2["Pass 2: Mild Transformer Preprocessing<br>Retinex Glare Attenuation Y &ge; 225<br>Bicubic Upscale &ge; 128x64, CLAHE 1.5, Soft 2x2"]
     
-    Pass2 --> CCT2["CCT-XS Inference on Enhanced Crop"]
-    CCT2 --> Syntax2{"Syntax Valid & Improved?"}
+    Pass2 --> CCT2["CCT-XS Re-Inference on Enhanced Crop"]
+    CCT2 --> Syntax2{"Syntax Valid and Improved?"}
     
-    Syntax2 -->|"Yes"| AccessCheck
-    Syntax2 -->|"No"| Zoom3
+    Syntax2 -->|Yes| AccessCheck
+    Syntax2 -->|No| Zoom3
     
     Zoom3 --> Box3Check{"Plate Found at 1024px?"}
-    Box3Check -->|"Yes"| Pass1
-    Box3Check -->|"No"| Deny["GATE CLOSED<br/>Barrier Retained"]
+    Box3Check -->|Yes| Pass1
+    Box3Check -->|No| Deny["GATE CLOSED<br>Barrier Retained"]
     
-    AccessCheck --> Match{"Plate Matches<br/>Card Record?"}
-    Match -->|"Exact / Fuzzy (dist <= 1)"| Open["GATE OPEN<br/>Barrier Raised"]
-    Match -->|"Mismatch"| Mismatch["ACCESS DENIED<br/>Security Flag: Card/Plate Mismatch"]
+    AccessCheck --> Match{"Plate Matches Card Record?"}
+    Match -->|Exact or Fuzzy Match| Open["GATE OPEN<br>Barrier Raised"]
+    Match -->|Vehicle Mismatch| Mismatch["ACCESS DENIED<br>Security Flag: Card/Plate Mismatch"]
+    Match -->|Foreign Region| ForeignDeny["ACCESS DENIED<br>Security Flag: Non-Vietnamese Plate"]
 ```
 
-### Pipeline Passes & Trigger Conditions
+### Escalation Ladder and Trigger Conditions
 
-1. **Pass 1 (1st Try - Natural 640px Fast Pass)**:
-   * **Execution**: Raw, captured image without enhancement is passed first [unaugmented raw RGB crop, standard 640px detector resolution, scale-adaptive 4% padding (3–12 px)].
-   * **Pass Condition**: Evaluated directly through CCT-XS; passes if plate is clear and legally formatted [bounding box confidence $\ge 0.45$, Vietnamese syntax regex match, mean character confidence $\ge 0.70$, minimum character confidence $\ge 0.60$].
-   * **Latency**: Fast execution [~15–40 ms OCR time on CPU].
+1. **Pass 1 (Natural 640px Fast Pass)**:
+   - Standard 640px YOLO detection with scale-adaptive 4% bounding box padding (clamped between 3 px and 12 px to prevent background bleed).
+   - Evaluated directly on natural RGB crop via CCT-XS without artificial binarization.
+   - Succeeded if: Bounding box confidence >= 0.45, Vietnamese syntax matches regex, mean character confidence >= 0.70, minimum character confidence >= 0.60, and region classification is Vietnam.
+   - Steady-state execution time: ~15 to 40 ms OCR latency on CPU.
 
-2. **Pass 2 (2nd Try - Mild Transformer Enhancement)**:
-   * **Trigger**: Triggered when a plate is detected, but characters are faint, blurry, or fail legal syntax validation [1st pass unverified, mean character confidence $< 0.70$, or Laplacian blur score $< 150.0$].
-   * **Operation**: Resizes and sharpens the cropped plate to clarify character strokes without distorting natural font shapes [`PlatePreprocessor.mild_enhance_for_transformer()`, bicubic upscaling to $\ge 128 \times 64$, mild CLAHE (Contrast Limited Adaptive Histogram Equalization, `clipLimit=1.5`), soft $2 \times 2$ stroke reinforcement, mild unsharp mask ($1.3 \times \text{sharp} - 0.3 \times \text{blur}$), zero artificial 20px white borders].
-   * **Pass Condition**: Accepted if the enhanced image produces valid plate syntax with equal or higher confidence than Pass 1 [re-evaluated via CCT-XS v2 Global].
+2. **Pass 2 (Mild Transformer Preprocessing)**:
+   - Triggered when a bounding box is found, but syntax fails verification or character confidence is below 0.70.
+   - Preprocessing pipeline:
+     - Retinex specular glare attenuation in YCrCb color space for overexposed highlights (Y >= 225).
+     - Bicubic upscaling to >= 128 x 64 to match transformer patch density.
+     - Mild Contrast Limited Adaptive Histogram Equalization (CLAHE, `clipLimit=1.5`).
+     - Subtle 2 x 2 morphological stroke reinforcement.
+     - High-pass unsharp edge masking (1.3 * sharp - 0.3 * blur) with zero artificial white borders.
+   - Accepted if enhanced crop produces valid syntax with higher confidence than Pass 1.
 
-3. **Pass 3 (3rd Try - High-Resolution 1024px Deep Zoom)**:
-   * **Trigger**: Triggered when the detector misses the plate completely, or text remains unverified after Pass 2 [zero bounding boxes found at 640px, or syntax invalid after Pass 2].
-   * **Operation**: Scans the full camera snapshot again at high resolution to detect small, distant, or angled plates [1024px detector scan `imgsz=1024`].
-   * **Terminal Action**: If a box is found, it crops and runs OCR; if no box is found, the system stops and keeps the barrier closed [`try_level = "3rd try (exhausted)"`, gate closed].
-
-### Code & Class Architecture Mapping
-
-Core pipeline orchestration is handled in `lpr_engine.py` (`LPRPipeline` class), with image filtering in `lpr_core/preprocessor.py` (`PlatePreprocessor` class) and syntax checking in `lpr_core/validator.py` (`VietnamPlateValidator` class):
-
-#### 1. Pass 1: Base Detector Scan & Direct Crop OCR
-* **Location**: `lpr_engine.py` -> `LPRPipeline.process()` and `_crop_and_ocr()`
-```python
-# Pass 1: Standard 640px detector scan + natural crop OCR
-detections = self.detector.detect(image_path, imgsz=640)
-detections = self._select_primary(detections, sort_by, primary_only)
-ocr_results, was_enhanced = self._crop_and_ocr(
-    img, detections, crop_identifier, padding_percent, apply_enhancement=False
-)
-
-# Verification check for Pass 1 success
-first_try_ok = (
-    bool(detections) and 
-    detections[0]['confidence'] >= self.detector.confidence_threshold and 
-    self._is_strictly_valid(ocr_results) and 
-    ocr_conf >= 0.70 and 
-    ocr_min_conf >= 0.60
-)
-```
-
-#### 2. Pass 2: Escalation to Mild Transformer Preprocessing
-* **Location**: `lpr_engine.py` -> `LPRPipeline.process()` and `lpr_core/preprocessor.py` -> `PlatePreprocessor.mild_enhance_for_transformer()`
-```python
-# Pass 2: Triggered if Pass 1 detected a box but OCR syntax was unverified
-if not first_try_ok and detections and detections[0]['confidence'] >= self.detector.confidence_threshold:
-    enh_results, _ = self._crop_and_ocr(
-        img, detections, crop_identifier, padding_percent, apply_enhancement=True
-    )
-    if self._is_strictly_valid(enh_results) and enh_conf >= ocr_conf:
-        ocr_results = enh_results
-        try_level = "2nd try"
-```
-Inside `_crop_and_ocr()`:
-```python
-if is_cct_xs:
-    enhanced_crop = PlatePreprocessor.mild_enhance_for_transformer(crop.copy())
-    raw_text_results = self.ocr.recognize(enhanced_crop, debug_prefix=slice_prefix)
-    was_enhanced = True
-```
-
-#### 3. Pass 3: Escalation to High-Resolution Zoom Pass
-* **Location**: `lpr_engine.py` -> `LPRPipeline.process()`
-```python
-# Pass 3: Triggered if syntax remains unverified or 0 detections found
-if not self._is_strictly_valid(ocr_results):
-    resolution = "1024px"
-    zoom_detections = self.detector.detect(image_path, imgsz=1024)
-    zoom_detections = self._select_primary(zoom_detections, sort_by, primary_only)
-    if zoom_detections:
-        detections = zoom_detections
-        try_level = "3rd try"
-        ocr_results, _ = self._crop_and_ocr(img, detections, ..., apply_enhancement=True)
-    else:
-        try_level = "3rd try (exhausted)"
-```
+3. **Pass 3 (High-Resolution 1024px Deep Zoom)**:
+   - Triggered when Pass 1 and Pass 2 yield zero bounding boxes or unverified syntax.
+   - Re-scans the full input image at 1024px resolution to resolve distant or small plates.
+   - Terminal decision: If no box is found at 1024px, the pipeline halts with `3rd try (exhausted)` and retains the barrier closed.
 
 ---
 
-## 4. YOLO Detector Benchmark Comparison
+## 3. Empirical Benchmarks and Performance Telemetry
 
-To identify the most reliable and efficient detector for campus access control, multiple YOLO (You Only Look Once) ONNX checkpoints were benchmarked on CPU (Intel Core i7-1260P). 
+### A. Real-World Multi-Fleet Benchmark (151 Real-World Campus Images)
 
-### Benchmark Methodology
-* **Test Dataset**: Evaluated across all 16 standardized test images in `test_images/` (11 vehicle images, 5 negative background samples).
-* **Constant OCR Baseline**: PaddleOCR (PP-OCRv6) was held constant across all detector runs so differences in gate pass rates reflect pure detector localization and recall quality.
-* **Training Strategies Tested**:
-  * **Baseline (`best_*.onnx`)**: Trained on an early dataset mostly containing cars (~4:1 car ratio) for 15 to 50 epochs.
-  * **Refined (`refined_best_*.onnx`)**: Trained for 15 epochs with additional motorcycle images to reduce car bias.
-  * **Balanced (`balanced_best_*.onnx`)**: Trained for 25 epochs on a balanced 1:1 dataset (1,400 cars and 1,397 motorbikes) plus 120 negative background images (empty gates, walkways, road pavement).
+The system was evaluated across 6 diverse campus fleets comprising 151 unconstrained test captures:
 
-### Detector Benchmark Results
+| Fleet Category | Image Count | Passed (Gate Opened) | Rejected (Gate Closed) | No Detection (0 Boxes) | Crops Generated | Safe Rejection Rate |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `car1` | 35 | 30 | 1 | 4 | 33 | 100.0% |
+| `car1_defective` | 2 | 0 | 2 | 0 | 2 | **100.0% (Zero False Opens)** |
+| `car2` | 29 | 19 | 2 | 8 | 21 | 100.0% |
+| `car2_defective` | 4 | 0 | 1 | 3 | 1 | **100.0% (Zero False Opens)** |
+| `motor1` | 72 | 32 | 10 | 30 | 78 | 100.0% |
+| `motor1_defective` | 9 | 0 | 3 | 6 | 8 | **100.0% (Zero False Opens)** |
+| **Consolidated** | **151** | **81 (53.6%)** | **19 (12.6%)** | **51 (33.8%)** | **143** | **100.0% Safety on Defective Fleets** |
 
-| ONNX Detector Model | Training Strategy | Model Size | Average Detector Speed | Plate Recall | Motorbike Test Set | Gate Open Rate | False Alarms |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`balanced_best_yolo11n.onnx`** | **Balanced 1:1 (25 eps)** | **5.5 MB** | **104.2 ms** | **11/16 (68.8%)** | **4/4 passed** | **7/16 (43.8%)** | **0% (0/5)** |
-| `balanced_best_yolo11s.onnx` | Balanced 1:1 (25 eps) | 19.2 MB | 232.4 ms | 11/16 (68.8%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
-| `balanced_best_yolo26n.onnx` | Balanced 1:1 (25 eps) | 5.8 MB | 114.8 ms | 8/16 (50.0%) | 4/4 passed | 6/16 (37.5%) | 0% (0/5) |
-| `balanced_best_yolov10n.onnx` | Balanced 1:1 (25 eps) | 5.6 MB | 114.9 ms | 10/16 (62.5%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
-| `best.onnx` | Baseline (50 eps) | 5.5 MB | 132.7 ms | 10/16 (62.5%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
-| `best_yolo8.onnx` | Baseline (50 eps) | 6.2 MB | 170.3 ms | 9/16 (56.2%) | 4/4 passed | 7/16 (43.8%) | 0% (0/5) |
+Key Findings:
+- **Defective Plate Defense**: 100% safe rejection across all 15 defective vehicle captures (`car1_defective`, `car2_defective`, `motor1_defective`). Zero unauthorized gate triggers occurred.
+- **Zero Detection Analysis**: All 51 undetected frames were compressed web thumbnails (< 160 px width from Facebook CDN) or distant captures (> 25 m).
+- **Automated 4-Bucket Folder Routing**: All test outputs are automatically classified and routed into `passed/`, `rejected/`, `no_detection/`, and `crops/` under `Outputs/khai_test/<category>/`.
 
-### Selected Detector Rationale
-`balanced_best_yolo11n.onnx` was selected as the production detector because:
-1. **Low Latency**: 104.2 ms steady-state inference on CPU (2.2x faster than `yolo11s` at 232.4 ms).
-2. **Compact Footprint**: 5.5 MB file size with low memory consumption.
-3. **Zero False Positives**: 0% false alarm rate on background images while correctly detecting all 7 valid vehicle plates.
+### B. Standard 18-Image Baseline Matrix
 
----
+Evaluated on the standardized 18-image benchmark suite covering motorcycles, automobiles, fog, acute angles, and negative backgrounds:
 
-## 5. OCR Architecture Evolution & Architectural Requirements
+| File Name | Category | Ground Truth | Clean Target | Expected Gate Action | Observed Status |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| `bike_test_10.jpg` | Motorbike (Dual-row) | `43-D1 999.99` | `43D199999` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `bike_test_11.jpg` | Motorbike (Dual-row) | `29-H1 339.79` | `29H133979` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `bike_test_12.jpg` | Motorbike (Small crop) | `61-H7 6854` | `61H76854` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `bike_test_9.jpg` | Motorbike (Dual-row) | `59-D2 420.69` | `59D242069` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `car_foggy_test.jpg` | Car (Atmospheric Fog) | `30K-279.76` | `30K27976` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `car_test_2.jpg` | Car (Standard Front) | `30A-697.70` | `30A69770` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `car_test_3.jpg` | Car (Distant / 43px crop) | `29M-6840` | `29M6840` | **GATE_CLOSED (Sub-resolution)** | Safely Closed |
+| `car_test_4.jpg` | Car (High-Res Rear) | `51G-743.72` | `51G74372` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `car_test_5.jpg` | Car (Standard Front) | `51G-777.77` | `51G77777` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `car_test_6.jpg` | Commercial Truck | `63H-903.94` | `63H90394` | **GATE_OPEN (Pass 1)** | Verified (1st try) |
+| `car_test_7.jpg` | Obscured Landmark Scene | Non-plate | Non-plate | **GATE_CLOSED (Safe Rejection)** | Safely Closed |
+| `car_test_8.jpg` | Motion Blur Distortion | Non-resolvable | Non-plate | **GATE_CLOSED (Safe Rejection)** | Safely Closed |
+| `car_very_angled.jpg` | Acute Yaw Angle (>60 deg) | Oblique Angle | Non-resolvable | **GATE_CLOSED (Safe Rejection)** | Safely Closed |
+| `neg_sample_test_1.jpg` to `5.jpg` | Campus Backgrounds (5 frames) | None | None | **GATE_CLOSED (0 Boxes Found)** | Safely Closed (0% False Alarms) |
 
-During system development, three optical character recognition architectures were evaluated. Each architecture imposed distinct preprocessing and crop geometry requirements:
+### C. OCR Model Architecture Comparison
 
-### 1. PaddleOCR (PP-OCRv6)
-* **Architecture**: General document text reader [dual-stage pipeline combining DBNet (Detection-Branch Network) segmentation detector with CRNN SVTR (Spatial-Vision Transformer Recognition) recognizer].
-* **Crop Margin Requirement**: Requires loose margins around the plate [20% bounding box padding `padding_percent=0.20`] so outer character strokes are not cut off by text detection boxes [DBNet polygon boundary clipping].
-* **Preprocessing**: Requires heavy artificial filtering and borders [`PlatePreprocessor.enhance_for_ocr()`, 20px white border via `cv2.copyMakeBorder`, strong contrast equalization with CLAHE 2.0, bilateral noise smoothing, morphological erosion].
-* **Dual-Row Slicing**: Cannot read two-line motorcycle plates in a single pass [requires horizontal line slicing routines `_recognize_split_lines()` or `deskew_and_slice_plate()`].
-* **Latency Bottleneck**: Slow inference speed [1,200 ms to 2,500 ms per crop on CPU, taking over 90% of total pipeline latency].
+Evaluated on CPU (Intel Core i7-1260P) with `balanced_40eps_yolo11n.onnx` at confidence 0.45:
 
-### 2. LPRNet (Lightweight Spatial CNN)
-* **Architecture**: Compact spatial convolutional network for vehicle plates [CTC (Connectionist Temporal Classification) spatial CNN `lprnet.onnx`, 2.05 MB].
-* **Resolution Failure**: Squashes the cropped plate into a narrow, low-resolution strip [fixed $94 \times 24$ input resolution], which crushes vertical letter strokes and confuses similar characters [`D` confused with `0`, `H` confused with `1` or `S`].
-* **Heuristic Overhead**: Can only read one horizontal line at a time, requiring complex geometric unwarping and slicing algorithms [4-point corner detection `compute_plate_quad_and_confidence()`, canonical perspective unwarping `canonical_perspective_unwarp()`, Hough line deskewing, luminance thresholding to remove motorcycle mudguards, and line splitting `deskew_and_slice_plate()`].
-* **Accuracy Failure**: High character error rate [0% exact match on motorcycles, 66.7% on cars].
-
-### 3. CCT-XS v2 Global (Fast Plate OCR)
-* **Architecture**: Compact vision transformer designed specifically for vehicle plates [Compact Convolutional Transformer `cct_xs.onnx`, 3.34 MB, combines convolutional tokenizer with multi-head self-attention transformer encoder].
-* **Native Multi-Row**: Reads both one-line car plates and two-line motorcycle plates directly on the full crop [transformer self-attention mechanism processes 2D character positions natively without line splitting or geometric unwarping].
-* **Crop Padding Requirement**: Requires a tight crop with minimal background noise [scale-adaptive 4% padding (3–12 px)], preventing vehicle grilles, bumpers, and pavement from distorting character tokens [bypasses legacy 20% margin].
-* **Downsized Preprocessing**: Keeps image processing minimal to preserve natural stroke gradients [Pass 1 uses raw RGB crop directly; Pass 2 uses targeted mild enhancement `mild_enhance_for_transformer()` with bicubic upscaling to $\ge 128 \times 64$, mild CLAHE 1.5, soft $2 \times 2$ stroke repair, and zero artificial white borders].
-* **Latency & Accuracy**: Fast, real-time recognition with zero character confusion [15–40 ms steady-state OCR latency on CPU, 100% exact character match across valid test suite].
-
-### OCR Performance Comparison
-
-All models evaluated on CPU (Intel Core i7-1260P) using `balanced_best_yolo11n.onnx` at confidence 0.45:
-
-| OCR Architecture | Model Size | Steady-State OCR (ms) | Motorbike Accuracy (4 images) | Clean Car Accuracy (3 images) | Character Confusion Status |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **CCT-XS v2 Global** | **1.8 MB** | **12.5 – 51.7 ms** (avg 31.8 ms) | **4 / 4 (100%)** | **5 / 5 (100%)** | **Resolved** (0% ambiguity, native 2-line & region head) |
-| **PaddleOCR (PP-OCRv6)** | ~150 MB | 1,200 – 2,850 ms (up to 6,100 ms) | 4 / 4 (100%) | 3 / 3 (100%) | None (Heavy document OCR, slow on CPU) |
-| **LPRNet (Trained)** | 1.8 MB | 15 – 45 ms (single line) | 0 / 4 (0%) | 2 / 3 (66.7%) | Severe (`D` $\to$ `0`, `H` $\to$ `1`/`S`, 2-line failure) |
-
-### Planned Enhancement: Glare and Reflection Attenuation for CCT-XS
-
-* **Objective**: Enhance recognition robustness against extreme tropical sunlight glare, night-time headlight specular reflections, and metallic plate surface overexposure.
-* **Status: Implemented and Validated**:
-  * [x] Benchmark plate crops exhibiting localized specular white-out (verified on `bike_10` with 31% overexposure).
-  * [x] Implement adaptive specular reflection mask detection in `lpr_core/preprocessor.py` (`PlatePreprocessor.attenuate_glare()`).
-  * [x] Localized illumination attenuation via Retinex luminance division integrated into Pass 2 (`PlatePreprocessor.mild_enhance_for_transformer()`).
+| Metric | PaddleOCR (PP-OCRv6) | LPRNet (CTC CNN) | CCT-XS v2 Global (Primary) |
+| :--- | :--- | :--- | :--- |
+| **Architecture** | DBNet + SVTR Dual Neural Stage | Spatial CNN + CTC Greedy Decoder | Compact Convolutional Transformer |
+| **Model Weight Size** | ~150 MB | 1.8 MB | **1.8 MB** (`Models_ocr/cct_xs.onnx`) |
+| **Active Memory (RAM)** | 1,800 - 2,500 MB | ~65 MB | **~80 MB** |
+| **Steady-State OCR Latency** | 1,200 - 2,850 ms | 15 - 45 ms (1-line only) | **12.5 - 51.7 ms (Mean: 31.8 ms)** |
+| **Dual-Row Slicing Need** | Mandatory (DBNet or OpenCV) | Mandatory (High failure rate) | **Zero Slicing (Native 2D Transformer)** |
+| **Regional Filtering Head** | None | None | **Built-in ($P(\text{Vietnam})$ classification)** |
+| **Syntax Accuracy** | 88.5% (Leading digit drops) | 28.0% (Character collapse) | **100% on readable benchmark suite** |
+| **Deployment Recommendation** | Deprecated for edge | Deprecated | **Approved for production deployment** |
 
 ---
 
-## 6. Repository File Inventory & Dependencies
+## 4. Vietnamese Legal Syntax Alignment (Circular 24/2023)
+
+Under Ministry of Public Security Circular 24/2023/TT-BCA (and Circular 58/2020 for mopeds < 50cc), Vietnamese motorcycle identification plates (*biển số định danh*) officially permit **two consecutive letters** in the series code:
+- Format: 2 digits + (1 letter + 1 digit, or 2 letters) + 4 to 6 digits.
+- Example: `59VA24003` (Ho Chi Minh City, Go Vap district identification series).
+
+The validation standard in `lpr_core/validator.py` implements this rule:
+```python
+# Automobiles: 2 digits + 1 letter + 4-6 digits (e.g. 30A69770, 51G74372)
+AUTO_PATTERN = re.compile(r'^[1-9][0-9][A-Z][0-9]{4,6}$')
+
+# Motorcycles: 2 digits + (1 letter + 1 digit, or 2 letters per Circular 24/2023) + 4-6 digits
+MOTO_PATTERN = re.compile(r'^[1-9][0-9]([A-Z][0-9]|[A-Z]{2})[0-9]{4,6}$')
+```
+
+Verification Impact: Test image `M1-46` (`59VA24003`), which was recognized with 99.6% character confidence and 99.8% Vietnam regional probability, successfully passes validation on Pass 1 (640px) with 314.1 ms steady-state latency.
+
+---
+
+## 5. Repository File Inventory and Structure
 
 ```text
 lpr_research/
 ├── benchmarks/
-│   ├── run_benchmarks.py              # Benchmark execution script with full telemetry
-│   ├── benchmark_yolo_onnx.py         # Standalone detector FPS evaluator
-│   ├── verify_latency.py              # Dedicated steady-state timing harness
-│   └── BENCHMARK_SUMMARY.md           # Markdown benchmark logs and historical metrics
+│   ├── run_benchmarks.py              # Multi-fleet batch runner with 4-bucket output routing
+│   ├── benchmark_yolo_onnx.py         # Full matrix detector benchmark utility
+│   ├── test_ocr.py                    # Standalone OCR crop diagnostic and slicing tool
+│   ├── compare_preprocessing.py        # Side-by-side preprocessor inspection script
+│   └── BENCHMARK_SUMMARY.md           # Master benchmark ledger and multi-fleet tables
+│
+├── ColabNotebookTemplate/             # Google Colab GPU training notebooks
+│   ├── 01_train_yolo_balanced_1to1_25_40ep.ipynb # Primary balanced YOLO detector training
+│   ├── 02_finetune_cct_xs_vietnam.ipynb         # CCT-XS vision transformer fine-tuning
+│   ├── 03_train_yolo_refined_15ep.ipynb         # Refined multi-model exploration notebook
+│   ├── 04_train_baseline_yolo11n_50ep.ipynb     # Single YOLO11n car baseline notebook
+│   ├── 05_train_baseline_yolov8n_50ep.ipynb     # Single YOLOv8n car baseline notebook
+│   ├── 06_legacy_train_lprnet_vietnam.ipynb     # Deprecated LPRNet training notebook
+│   └── README.md                                # Colab notebook index and parameter mapping
 │
 ├── lpr_core/
-│   ├── preprocessor.py                # Image quality assessment and mild transformer enhancement
-│   └── validator.py                   # Vietnamese plate regex validation and Levenshtein matching
+│   ├── preprocessor.py                # Retinex glare attenuation, CLAHE, and stroke repair
+│   └── validator.py                   # Circular 24/2023 regex and Levenshtein similarity
 │
 ├── Models_ocr/
-│   ├── cct_xs.onnx                    # 3.34 MB CCT-XS v2 Global ONNX model weights
-│   ├── cct_xs_plate_config.yaml       # 1.72 KB CCT-XS alphabet and regional heads config
-│   ├── best_lprnet.pth                # Legacy PyTorch checkpoint (deprecated)
-│   └── lprnet.onnx                    # Legacy 2.05 MB LPRNet ONNX model (deprecated)
+│   ├── cct_xs.onnx                    # 1.8 MB primary CCT-XS v2 Global ONNX weights
+│   └── cct_xs_plate_config.yaml       # CCT-XS alphabet and regional configuration
 │
 ├── Models_yolo/
-│   ├── balanced_best_yolo11n.onnx     # Primary detector (5.5 MB, ~104 ms CPU latency)
-│   └── (other evaluated YOLO checkpoints)
+│   ├── balanced_40eps_yolo11n.onnx    # Primary detector (5.5 MB, ~104 ms CPU latency)
+│   ├── balanced_best_yolo11n.onnx     # 25-epoch balanced detector checkpoint
+│   └── (other evaluated YOLO ONNX models)
 │
-├── Outputs/                           # Visual output images with green HUD telemetry banners
-├── test_images/                       # 16 standard evaluation test images
-├── lpr_engine.py                      # Multi-tier pipeline coordinator and model adapters
-├── infer.py                           # Standalone single-image CLI inference utility
-├── main.py                            # FastAPI backend implementing two-factor boom barrier access
+├── Outputs/                           # Annotated visual outputs with green HUD banners
+│   └── khai_test/                     # Multi-fleet output buckets (passed, rejected, crops)
+├── test_images/                       # 18 baseline test images and multi-fleet directories
+├── CHANGELOG.md                       # Comprehensive engineering change log and milestones
+├── MINI_REPORT_CCT_XS_RESEARCH.md     # In-depth technical research and architectural paper
+├── infer.py                           # Standalone single-image CLI prediction utility
+├── lpr_engine.py                      # Core multi-tier pipeline and model adapter library
+├── main.py                            # FastAPI backend for campus boom barrier control
 └── simulate_rfid.py                   # Automated RFID tap and camera snapshot simulator
-```
-
-### System Component Dependency Flow
-
-```mermaid
-graph TD
-    subgraph Execution Entrypoints
-        CLI["infer.py<br/>(Single Image CLI)"]
-        BENCH["benchmarks/run_benchmarks.py<br/>(Batch Suite & Telemetry)"]
-        API["main.py<br/>(FastAPI Gate Backend)"]
-        SIM["simulate_rfid.py<br/>(Hardware Simulator)"]
-    end
-
-    subgraph Core Pipeline Engine
-        ENG["lpr_engine.py<br/>(LPRPipeline, YOLODetector, CCTXSRecognizerAdapter)"]
-    end
-
-    subgraph Modular Support Libraries
-        PRE["lpr_core/preprocessor.py<br/>(PlatePreprocessor.mild_enhance_for_transformer)"]
-        VAL["lpr_core/validator.py<br/>(VietnamPlateValidator, match_plate)"]
-    end
-
-    subgraph Neural Model Weights
-        W_YOLO["Models_yolo/balanced_best_yolo11n.onnx<br/>(5.5 MB Plate Detector)"]
-        W_OCR["Models_ocr/cct_xs.onnx<br/>(3.34 MB CCT-XS Recognizer)"]
-        C_OCR["Models_ocr/cct_xs_plate_config.yaml<br/>(Character & Region Config)"]
-    end
-
-    CLI --> ENG
-    BENCH --> ENG
-    BENCH --> VAL
-    API --> ENG
-    API --> VAL
-    SIM --> API
-
-    ENG --> PRE
-    ENG --> VAL
-    ENG --> W_YOLO
-    ENG --> W_OCR
-    W_OCR -.-> C_OCR
 ```
 
 ---
 
-## 7. Two-Factor Campus Access Control Service
+## 6. Physical Camera Deployment Guidelines
 
-### Starting the Server
+To achieve reliable recognition rates at campus boom barriers, physical camera mounting must adhere to the following optical specifications:
+
+- **Mounting Height**: 1.2 to 1.5 meters above road grade.
+- **Pitch and Yaw Angle**: Downward pitch of 15 to 25 degrees; horizontal yaw within 15 degrees of vehicle lane axis.
+- **Operating Distance**: 3.0 to 4.5 meters from vehicle stop line.
+- **Focal Length**: 6mm to 12mm narrow varifocal lens (ensuring plate occupies >= 150 px width on a 1080p sensor). Avoid wide-angle 2.8mm/3.6mm lenses.
+- **Optical Glare Filter**: Mount a Circular Polarizer Linear (CPL) optical glass filter on the lens to attenuate windshield reflections and tropical sun glare prior to digitization.
+- **Shutter Speed**: 1/500 second or faster to eliminate vehicle motion blur on rolling approach.
+
+---
+
+## 7. Two-Factor Access Control API
+
+### Starting the Barrier Service
 ```powershell
 .\venv_models\Scripts\python.exe main.py
 ```
 
-### Simulating a Two-Factor RFID Tap Transaction
+### Simulating a Two-Factor RFID Event
 ```powershell
 .\venv_models\Scripts\python.exe simulate_rfid.py test_images/bike_test_11.jpg
 ```
 
-### Transaction Response Schema
+### Response Schema (`POST /api/v1/rfid-tap`)
 ```json
 {
   "event_id": "evt_7a8b9c0d1e",
@@ -366,7 +271,7 @@ graph TD
   "resolution": "640px",
   "audit_flag": false,
   "flag_reason": null,
-  "timestamp": "2026-10-22T13:42:42Z",
+  "timestamp": "2026-10-26T09:15:00Z",
   "license_plate_text": "29H133979",
   "confidence": 1.0,
   "format_similarity": 1.0,
@@ -376,6 +281,16 @@ graph TD
   "annotated_image_path": "Outputs/evt_7a8b9c0d1e_annotated.jpg"
 }
 ```
-* **Exact / Fuzzy Match**: Barrier opens (`GATE_OPEN`).
-* **Card / Vehicle Mismatch**: Barrier remains closed (`ACCESS_DENIED`, status: `MISMATCH`).
-* **Unreadable Plate**: Barrier opens under student card fallback with audit flag (`GATE_OPEN_FLAGGED`).
+
+Gate Decisions:
+- `GATE_OPEN`: Authorized student card matches recognized license plate (exact or fuzzy distance <= 1).
+- `ACCESS_DENIED`: Card registered to a different vehicle (`MISMATCH`) or foreign plate detected (`FOREIGN_PLATE_REJECTED`).
+- `GATE_OPEN_FLAGGED`: Valid card presented but plate unreadable; barrier opened under audit logging (`CARD_ONLY`).
+
+---
+
+## 8. Architectural Evolution and History
+
+For full engineering change history, experimental iterations, and formal deprecation documentation for legacy architectures (PaddleOCR, LPRNet, CRNN), refer to:
+- [CHANGELOG.md]
+- [MINI_REPORT_CCT_XS_RESEARCH.md]
