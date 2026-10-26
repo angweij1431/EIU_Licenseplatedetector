@@ -6,8 +6,9 @@ class VietnamPlateValidator:
     # Automobiles (e.g. 30E69770, 29M6840, 51G74372): 2 digits + 1 letter + 4-6 digits
     AUTO_PATTERN = re.compile(r'^[1-9][0-9][A-Z][0-9]{4,6}$')
     
-    # Motorcycles (e.g. 59D242069, 63H90394, 77C144470): 2 digits + 1 letter + 1 digit + 4-6 digits
-    MOTO_PATTERN = re.compile(r'^[1-9][0-9][A-Z][0-9][0-9]{4,6}$')
+    # Motorcycles: 2 digits + (1 letter + 1 digit, or 2 letters per Circular 24/2023) + 4-6 digits
+    # Examples: 59D242069, 63H90394, 77C144470, 59VA24003
+    MOTO_PATTERN = re.compile(r'^[1-9][0-9]([A-Z][0-9]|[A-Z]{2})[0-9]{4,6}$')
 
     @staticmethod
     def clean_and_correct(raw_text: str) -> dict:
@@ -73,8 +74,11 @@ class VietnamPlateValidator:
         
         # Standard Vietnamese plate templates (without symbols)
         # Automobile: DDLDDDD, DDLDDDDD, DDLDDDDDD (e.g. 29M6840, 30A69770, 51G74372)
-        # Motorcycle: DDLDDDDDD (e.g. 59D242069, 63H90394)
-        templates = ["DDLDDDD", "DDLDDDDD", "DDLDDDDDD", "DDLDDDDDDD"]
+        # Motorcycle: DDLDDDDDD (e.g. 59D242069), DDLLDDDDD (e.g. 59VA24003 per Circular 24/2023)
+        templates = [
+            "DDLDDDD", "DDLDDDDD", "DDLDDDDDD", "DDLDDDDDDD",
+            "DDLLDDDD", "DDLLDDDDD", "DDLLDDDDDD"
+        ]
         for t in templates:
             dist = VietnamPlateValidator.levenshtein_distance(mask, t)
             max_len = max(len(mask), len(t))

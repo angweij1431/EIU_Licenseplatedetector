@@ -56,11 +56,7 @@ run_prefix = args.prefix or infer_prefix(target_path)
 # Initialize primary plate detector
 model_path = args.model
 if not os.path.exists(model_path):
-    if model_path == "Models_yolo/best.onnx" and os.path.exists("Models_yolo/best.pt"):
-        print(f"Notice: 'Models_yolo/best.onnx' not found. Using 'Models_yolo/best.pt'.")
-        model_path = "Models_yolo/best.pt"
-    else:
-        raise FileNotFoundError(f"Detector model not found: {model_path}. Please place exported weights in Models_yolo/.")
+    raise FileNotFoundError(f"Detector model not found: {model_path}. Please place exported weights in Models_yolo/.")
 
 detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.45)
 ocr = get_ocr_adapter(args.ocr)

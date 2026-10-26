@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 # Import modular LPR engine
 from lpr_core.validator import VietnamPlateValidator
-from lpr_engine import YOLODetector, PaddleOCRAdapter, LPRPipeline
+from lpr_engine import YOLODetector, LPRPipeline, get_ocr_adapter
 
 # Import-level fallback for Windows console encoding
 if sys.platform == 'win32':
@@ -22,12 +22,10 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 # Initialize models once during startup to avoid reloading per request
 # Primary detector and Fast Plate OCR initialization
-model_path = "Models_yolo/balanced_best_yolo11n.onnx"
-if not os.path.exists(model_path):
-    model_path = "Models_yolo/best.onnx"
+model_path = "Models_yolo/balanced_40eps_yolo11n.onnx"
+
 primary_detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.45)
 
-from lpr_engine import get_ocr_adapter
 ocr = get_ocr_adapter("cct_xs")
 pipeline = LPRPipeline(
     detector=primary_detector, 
@@ -87,7 +85,7 @@ class LPRTransactionResponse(BaseModel):
 @app.get("/")
 def health_check():
     return {
-        "status": "YES ONLINE",
+        "status": "ONLINE",
         "service": "LPR RFID Gate Backend",
         "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ')
     }

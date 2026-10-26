@@ -2,31 +2,31 @@ import os
 import sys
 import time
 import argparse
-from datetime import datetime
 
 # Import modular pipeline components from lpr_engine
 from lpr_engine import (
     YOLODetector, 
-    PaddleOCRAdapter, 
     LPRPipeline,
     get_ocr_adapter
 )
 from lpr_core.validator import VietnamPlateValidator
 
-def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_best_yolo11n.onnx", conf_thresh: float = 0.45, 
+# Executes single-image inference and prints execution telemetry
+def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_40eps_yolo11n.onnx", 
+                  ocr_name: str = "cct_xs", conf_thresh: float = 0.45, 
                   force_try2: bool = False, force_try3: bool = False, measure_warm: bool = True):
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Input image not found: {image_path}")
 
     if not os.path.exists(model_path):
-        raise FileNotFoundError(f"ONNX model not found: {model_path}. Please place exported ONNX weights in Models_yolo/.")
+        raise FileNotFoundError(f"ONNX detector model not found: {model_path}")
 
     print("======================================================================")
     print(f"LPR MODEL INFERENCE: {os.path.basename(image_path)}")
     print("======================================================================")
-    print(f"[1] Loading AI Models (YOLO ONNX Plate Detector & cct-xs)")
+    print(f"[1] Loading AI Models (Detector: {os.path.basename(model_path)} | OCR: {ocr_name})")
     detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=conf_thresh)
-    ocr = get_ocr_adapter("cct_xs")
+    ocr = get_ocr_adapter(ocr_name)
     pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
 
     output_filename = f"output_{os.path.basename(image_path)}"
@@ -36,7 +36,7 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_best_
     summary = pipeline.process(
         image_path,
         save_annotated_name=output_filename,
-        sort_by='front', # this one determines the order of the detected plates if multiple are found
+        sort_by='front',
         primary_only=True,
         padding_percent=0.20,
         force_second_try=force_try2,
@@ -64,7 +64,7 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_best_
     print("======================================================================")
     print(f"Input Image             : {image_path}")
     print(f"Plate Detection Model   : {model_path}")
-    print(f"Text Recognition Model  : cct-xs (fast plateocr)")
+    print(f"Text Recognition Model  : {ocr_name}")
     print(f"Pipeline Escalation Path: {summary['try_level']} ({summary['resolution']})")
     print("----------------------------------------------------------------------")
     print("1. Plate detection results:")
@@ -81,9 +81,8 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_best_
     print("2. Text recognition & validation results:")
     print(f"  Raw OCR Segments      : {raw_lines}")
     print(f"  Cleaned License Plate : {extracted_text}")
-    print(f"  Vietnam Syntax Valid  : {'correct' if is_valid else 'NO'}")
+    print(f"  Vietnam Syntax Valid  : {'YES' if is_valid else 'NO'}")
     print(f"  Template Similarity   : {format_similarity * 100:.1f}%")
-
 
     ocr_conf = float(summary['ocr_results'][0].get('confidence', 0.0)) if summary['ocr_results'] else 0.0
     min_conf = float(summary['ocr_results'][0].get('min_confidence', 0.0)) if summary['ocr_results'] else 0.0
@@ -91,12 +90,10 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_best_
     reg_prob = float(summary['ocr_results'][0].get('region_prob', 0.0)) if summary['ocr_results'] else 0.0
     reg_display = f"{reg_name} ({reg_prob * 100:.1f}%)" if reg_name and reg_prob > 0 else (reg_name or "N/A")
 
-    # all additioanl metrics
     print(f"  Character Conf (Mean) : {ocr_conf * 100:.1f}%" if ocr_conf > 0 else "  Character Conf (Mean) : N/A")
     print(f"  Character Conf (Min)  : {min_conf * 100:.1f}%" if min_conf > 0 else "  Character Conf (Min)  : N/A")
     print(f"  Predicted Region      : {reg_display}")
 
-    
     print("----------------------------------------------------------------------")
     print("3. Speed of execution:")
     if summary.get('cold_detection_latency_ms') is not None and summary.get('warm_detection_latency_ms') is not None:
@@ -104,15 +101,15 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_best_
         warm_tot = summary['warm_total_latency_ms']
         print("  [Cold-Start - First Session Load]")
         print(f"    YOLO Detection Time : {summary['cold_detection_latency_ms']:.1f} ms")
-        print(f"    CCT-XS Text Time : {summary['cold_ocr_latency_ms']:.1f} ms")
+        print(f"    OCR Text Time       : {summary['cold_ocr_latency_ms']:.1f} ms")
         print(f"    Total Pipeline Time : {cold_tot:.1f} ms ({cold_tot / 1000.0:.2f} seconds)")
         print("  [Steady-State - Operational Gate Speed (Without Cold Start)]")
         print(f"    YOLO Detection Time : {summary['warm_detection_latency_ms']:.1f} ms")
-        print(f"    CCT-XS Text Time : {summary['warm_ocr_latency_ms']:.1f} ms")
+        print(f"    OCR Text Time       : {summary['warm_ocr_latency_ms']:.1f} ms")
         print(f"    Total Pipeline Time : {warm_tot:.1f} ms ({warm_tot / 1000.0:.2f} seconds)")
     else:
         print(f"  YOLO Detection Time   : {summary['detection_latency_ms']:.1f} ms")
-        print(f"  CCT-XS Text Time   : {summary['ocr_latency_ms']:.1f} ms")
+        print(f"  OCR Text Time         : {summary['ocr_latency_ms']:.1f} ms")
         print(f"  Total Inference Time  : {total_time * 1000:.1f} ms ({total_time:.2f} seconds)")
     print(f"  Saved Image with Box  : {summary['annotated_path']}")
     print("======================================================================\n")
@@ -121,14 +118,21 @@ def run_inference(image_path: str, model_path: str = "Models_yolo/balanced_best_
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Standalone LPR Model Inference Tool")
-    parser.add_argument("--image_path", nargs="?", default="test_images/car_test_2.jpg", help="Path to input test image")
-    parser.add_argument("--model", default="Models_yolo/balanced_best_yolo11n.onnx", help="Path to ONNX detector model (default: Models_yolo/balanced_best_yolo11n.onnx)")
+    parser.add_argument("image_path", help="Path to input vehicle image")
+    parser.add_argument("--model", default="Models_yolo/balanced_40eps_yolo11n.onnx", help="Path to ONNX detector model (default: Models_yolo/balanced_40eps_yolo11n.onnx)")
+    parser.add_argument("--ocr", default="cct_xs", help="OCR engine mode: cct_xs, paddleocr (default: cct_xs)")
     parser.add_argument("--conf", type=float, default=0.45, help="Confidence threshold (default: 0.45)")
-    parser.add_argument("--force_try2", action="store_true", help="Force 2nd try adaptive image enhancement (CLAHE + upscale)")
+    parser.add_argument("--force_try2", action="store_true", help="Force 2nd try adaptive image enhancement")
     parser.add_argument("--force_try3", action="store_true", help="Force 3rd try deep zoom (1024px detector pass)")
-    parser.add_argument("--no_warm", action="store_true", help="Disable steady-state warm pass measurement (cold-start only)")
+    parser.add_argument("--no_warm", action="store_true", help="Disable steady-state warm pass measurement")
     args = parser.parse_args()
 
-    run_inference(args.image_path, model_path=args.model, conf_thresh=args.conf, 
-                  force_try2=args.force_try2, force_try3=args.force_try3, 
-                  measure_warm=not args.no_warm)
+    run_inference(
+        args.image_path, 
+        model_path=args.model, 
+        ocr_name=args.ocr,
+        conf_thresh=args.conf, 
+        force_try2=args.force_try2, 
+        force_try3=args.force_try3, 
+        measure_warm=not args.no_warm
+    )
