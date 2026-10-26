@@ -79,6 +79,11 @@ class LPRTransactionResponse(BaseModel):
     ocr_latency_ms: float
     total_latency_ms: float
     annotated_image_path: str
+    # New detailed box and OCR metrics
+    box_coordinates: list[float] = []
+    box_confidence: float = 0.0
+    ocr_min_confidence: float = 0.0
+    character_details: list[dict] = []
 
 
 # Health check endpoint
@@ -212,7 +217,16 @@ def handle_rfid_card_tap(request: RFIDTapRequest):
             audit_flag = True
             flag_reason = "Unverified plate; opened on student card."
             print(f"AUDIT ALERT: Event {event_id} flagged - Card '{request.rfid_card_id}' without verified plate.")
+            
     
+       # Extract box and character details for client audit
+    primary_det = pipeline_res['detections'][0] if pipeline_res['detections'] else {}
+    box_coords = primary_det.get('box', [])
+    box_conf = primary_det.get('confidence', 0.0)
+    
+    r0 = pipeline_res['ocr_results'][0] if pipeline_res['ocr_results'] else {}
+    ocr_min_conf = r0.get('min_confidence', 0.0)
+    char_details = r0.get('character_details', [])
     return LPRTransactionResponse(
         event_id=event_id,
         rfid_card_id=request.rfid_card_id,
@@ -229,7 +243,11 @@ def handle_rfid_card_tap(request: RFIDTapRequest):
         detection_latency_ms=round(pipeline_res['detection_latency_ms'], 2),
         ocr_latency_ms=round(pipeline_res['ocr_latency_ms'], 2),
         total_latency_ms=round(total_latency, 2),
-        annotated_image_path=pipeline_res['annotated_path']
+        annotated_image_path=pipeline_res['annotated_path'],
+        box_coordinates=box_coords,
+        box_confidence=round(box_conf, 4),
+        ocr_min_confidence=round(ocr_min_conf, 4),
+        character_details=char_details
     )
 
 

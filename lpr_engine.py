@@ -528,18 +528,29 @@ class CCTXSRecognizerAdapter(BaseOCR):
         pred = preds[0]
         plate_text = pred.plate
         plate_len = len(plate_text)
-
-        # Extract per-character softmax probabilities across predicted plate slots
-        if pred.char_probs is not None and plate_len >0:
+         
+        char_details = []
+        if pred.char_probs is not None and plate_len > 0:
             plate_char_probs = pred.char_probs[:plate_len]
             mean_conf = float(np.mean(plate_char_probs))
             min_conf = float(np.min(plate_char_probs))
+            char_details = [
+                {"char": ch, "confidence": round(float(p), 4)}
+                for ch, p in zip(plate_text, plate_char_probs)
+            ]
         else:
             mean_conf = 0.0
             min_conf = 0.0
-
         region = getattr(pred, 'region', 'Unknown') or 'Unknown'
         region_prob = float(getattr(pred, 'region_prob', 0.0) or 0.0)
+        return [{
+            'text': plate_text,
+            'confidence': round(mean_conf, 4),
+            'min_confidence': round(min_conf, 4),
+            'character_details': char_details,
+            'region': region,
+            'region_prob': round(region_prob, 4)
+        }]
 
         return [{
             'text':plate_text,
