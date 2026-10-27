@@ -58,7 +58,7 @@ model_path = args.model
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"Detector model not found: {model_path}. Please place exported weights in Models_yolo/.")
 
-detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.45)
+detector = YOLODetector(model_path, target_classes=['plate', 'license_plate'], confidence_threshold=0.20)
 ocr = get_ocr_adapter(args.ocr)
 pipeline = LPRPipeline(detector=detector, ocr=ocr, enable_preprocessing=True)
 
@@ -179,19 +179,52 @@ for idx, img_path in enumerate(image_files):
         'raw': raw_lines
     })
 
-## Print aggregate summary report
-print("\n" + "=" * 152)
-print("BENCHMARK SUMMARY REPORT (CCT-XS v2 Global)")
-print("=" * 152)
-print(f"{'ID':<7} | {'Image':<22} | {'Try Level':<20} | {'Boxes':<5} | {'Box Conf':<8} | {'Plate':<15} | {'Valid':<5} | {'Mean Conf':<9} | {'Min Char':<8} | {'Region (Prob)':<18} | {'Det (ms)':<9} | {'OCR (ms)':<8}")
-print("-" * 152)
-for r in results_list:
-    valid_str = "YES" if r['valid'] else "NO"
-    box_conf_str = f"{r['box_conf']*100:.1f}%" if r['box_conf'] > 0 else "-"
-    conf_str = f"{r['ocr_conf']*100:.1f}%" if r['ocr_conf'] > 0 else "-"
-    min_str = f"{r['min_conf']*100:.1f}%" if r['min_conf'] > 0 else "-"
-    print(f"{r['id']:<7} | {r['image']:<22} | {r['try_level']:<20} | {r['boxes']:<5} | {box_conf_str:<8} | {r['plate']:<15} | {valid_str:<5} | {conf_str:<9} | {min_str:<8} | {r['region']:<18} | {r['det_ms']:<9.1f} | {r['ocr_ms']:<8.1f}")
-print("-" * 152)
+## Print aggregate summary report with auto-fitted column widths
+if results_list:
+    headers = {
+        'id': 'ID',
+        'image': 'Image',
+        'try_level': 'Try Level',
+        'boxes_str': 'Boxes',
+        'box_conf_str': 'Box Conf',
+        'plate': 'Plate',
+        'valid_str': 'Valid',
+        'conf_str': 'Mean Conf',
+        'min_str': 'Min Char',
+        'region': 'Region (Prob)',
+        'det_ms_str': 'Det (ms)',
+        'ocr_ms_str': 'OCR (ms)'
+    }
+
+    # Format string values for each row
+    for r in results_list:
+        r['boxes_str'] = str(r['boxes'])
+        r['valid_str'] = "YES" if r['valid'] else "NO"
+        r['box_conf_str'] = f"{r['box_conf']*100:.1f}%" if r['box_conf'] > 0 else "-"
+        r['conf_str'] = f"{r['ocr_conf']*100:.1f}%" if r['ocr_conf'] > 0 else "-"
+        r['min_str'] = f"{r['min_conf']*100:.1f}%" if r['min_conf'] > 0 else "-"
+        r['det_ms_str'] = f"{r['det_ms']:.1f}"
+        r['ocr_ms_str'] = f"{r['ocr_ms']:.1f}"
+
+    # Calculate max width for each column dynamically + 2 spaces padding
+    col_w = {}
+    for key, h_text in headers.items():
+        max_data_len = max(len(str(r.get(key, ""))) for r in results_list)
+        col_w[key] = max(len(h_text), max_data_len) + 2
+
+    header_line = " | ".join(f"{headers[k]:<{col_w[k]}}" for k in headers)
+    divider = "=" * len(header_line)
+
+    print("\n" + divider)
+    print("BENCHMARK SUMMARY REPORT (CCT-XS v2 Global)")
+    print(divider)
+    print(header_line)
+    print(divider)
+    for r in results_list:
+        row_line = " | ".join(f"{str(r.get(k, '')):<{col_w[k]}}" for k in headers)
+        print(row_line)
+    print(divider)
+
 
 # Compute aggregate evaluation metrics
 total_imgs = len(results_list)
