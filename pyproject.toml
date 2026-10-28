@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "EIU OITP Research Team"}
+    {name = "Ang Wei Jun - EIU OITP (Smart Parking)"}
 ]
 keywords = ["alpr", "anpr", "yolo", "ocr", "edge", "vietnam", "license-plate"]
 classifiers = [
