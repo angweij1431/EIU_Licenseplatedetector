@@ -5,60 +5,46 @@ venv*/
 env/
 .venv/
 
-# Large Model Weights (YOLO / PyTorch models)
-# *.pt
-*.onnx
+# Large Model Weights & Formats
 *.engine
 *.pth
-# Models_yolo/
-!Models_ocr/cct_xs.onnx
-!Models_yolo/balanced_40eps_yolo11n.onnx
-!Models_yolo/balanced_skew_robust_yolo11n.onnx
+*.pt
+*.onnx
 
-# Python Cache & Outputs
+# Allow Production Release Assets
+!models/detector.onnx
+!models/cct_xs.onnx
+!models/cct_xs_plate_config.yaml
+!models/checksums.sha256
+
+# Allow Specific Legacy Research Weights in Lab
+!lab/models_legacy/Models_ocr/cct_xs.onnx
+!lab/models_legacy/Models_yolo/balanced_40eps_yolo11n.onnx
+!lab/models_legacy/Models_yolo/balanced_skew_robust_yolo11n.onnx
+
+# Build Artifacts & Packaging
+build/
+*.egg-info/
+
+# Python Cache
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
-# Ignore all generated test output images, but keep folder structure via .gitkeep
-Outputs/**/*.jpg
-Outputs/**/*.png
-Outputs/*.jpg
-Outputs/*.png
-!Outputs/**/.gitkeep
-!Outputs/.gitkeep
+# Outputs & Generated Test Images
+Outputs/
+lab/Outputs/
+lab/Outputs/**/*.jpg
+lab/Outputs/**/*.png
+lab/dataset/**/*.zip
+lab/dataset/CAR MOTOR/
 
-# Explicitly track the 16 benchmark output images displayed in README.md
-!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_9.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_10.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_11.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_bike_test_12.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_2.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_3.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_4.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_5.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_6.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_7.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_car_test_8.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_1.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_2.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_3.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_4.jpg
-!Outputs/balanced_output/balanced_best_yolo11n_output_neg_sample_test_5.jpg
-
-# Ignore local test images (uncomment if you don't want test images tracked in git)
-# test_images/
-
-# Environment / API Keys
-.env
-
-# Local IDE settings
+# Local IDE & Environments
 .vscode/
 .idea/
+.env
 
-# Internal Research Documentation & Verification Scripts
-MINI_REPORT_LPR_RESEARCH.md
-benchmarks/verify_latency.py
-*HANDOFF*
-TEMP_HANDOFF*
+# Archive & Temporary Files
 *.zip
+*.log
+benchmarks/verify_latency.py

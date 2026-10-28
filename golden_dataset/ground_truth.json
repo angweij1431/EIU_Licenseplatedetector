@@ -1,0 +1,208 @@
+{
+  "dataset_version": "1.0",
+  "target_standard": "Circular 24/2023/TT-BCA",
+  "description": "Golden verification dataset containing 20 curated test images across cars, dual-row motorcycles, weather conditions, acute angles, and negative background frames.",
+  "images": [
+    {
+      "id": "golden-01",
+      "filename": "car_test_2.jpg",
+      "category": "Automobile",
+      "ground_truth_raw": "30A-697.70",
+      "ground_truth_normalized": "30A69770",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Standard frontal passenger car capture"
+    },
+    {
+      "id": "golden-02",
+      "filename": "car_test_4.jpg",
+      "category": "Automobile",
+      "ground_truth_raw": "51G-743.72",
+      "ground_truth_normalized": "51G74372",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "High-resolution rear passenger car capture"
+    },
+    {
+      "id": "golden-03",
+      "filename": "car_test_5.jpg",
+      "category": "Automobile",
+      "ground_truth_raw": "51G-777.77",
+      "ground_truth_normalized": "51G77777",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Frontal sedan with repetitive digit series"
+    },
+    {
+      "id": "golden-04",
+      "filename": "car_test_6.jpg",
+      "category": "Commercial Truck",
+      "ground_truth_raw": "63H-903.94",
+      "ground_truth_normalized": "63H90394",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Heavy logistics truck front plate"
+    },
+    {
+      "id": "golden-05",
+      "filename": "car_foggy_test.jpg",
+      "category": "Adverse Weather",
+      "ground_truth_raw": "30K-279.76",
+      "ground_truth_normalized": "30K27976",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Atmospheric fog, road spray, and low contrast"
+    },
+    {
+      "id": "golden-06",
+      "filename": "bike_test_9.jpg",
+      "category": "Motorcycle",
+      "ground_truth_raw": "59-D2 420.69",
+      "ground_truth_normalized": "59D242069",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Dual-row square motorcycle plate"
+    },
+    {
+      "id": "golden-07",
+      "filename": "bike_test_10.jpg",
+      "category": "Motorcycle",
+      "ground_truth_raw": "43-D1 999.99",
+      "ground_truth_normalized": "43D199999",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Dual-row motorcycle with potential D vs 0 optical confusion"
+    },
+    {
+      "id": "golden-08",
+      "filename": "bike_test_11.jpg",
+      "category": "Motorcycle",
+      "ground_truth_raw": "29-H1 339.79",
+      "ground_truth_normalized": "29H133979",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Dual-row motorcycle with H letter series"
+    },
+    {
+      "id": "golden-09",
+      "filename": "bike_test_12.jpg",
+      "category": "Motorcycle",
+      "ground_truth_raw": "61-H7 6854",
+      "ground_truth_normalized": "61H76854",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Low-resolution distant motorcycle crop requiring enhancement"
+    },
+    {
+      "id": "golden-10",
+      "filename": "car_sample_29D.jpg",
+      "category": "Commercial Van",
+      "ground_truth_raw": "29D-110.77",
+      "ground_truth_normalized": "29D11077",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Fleet commercial van standard capture"
+    },
+    {
+      "id": "golden-11",
+      "filename": "car_sample_51L.jpg",
+      "category": "Automobile",
+      "ground_truth_raw": "51L-953.46",
+      "ground_truth_normalized": "51L95346",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Modern registration series automobile"
+    },
+    {
+      "id": "golden-12",
+      "filename": "car_test_3.jpg",
+      "category": "Distant Sub-resolution",
+      "ground_truth_raw": "29M-6840",
+      "ground_truth_normalized": "29M6840",
+      "expected_valid": true,
+      "expected_detection": false,
+      "challenge": "Tiny sub-resolution plate (<45px width), expected safe rejection or sub-threshold"
+    },
+    {
+      "id": "golden-13",
+      "filename": "car_test_7.jpg",
+      "category": "Obscured Scene",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Obscured vehicle landscape without readable plate"
+    },
+    {
+      "id": "golden-14",
+      "filename": "car_test_8.jpg",
+      "category": "Severe Blur",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Severe high-speed motion blur distortion"
+    },
+    {
+      "id": "golden-15",
+      "filename": "car_very_angled.jpg",
+      "category": "Extreme Angle",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Acute yaw angle (>60 degrees) exceeding perspective tolerance"
+    },
+    {
+      "id": "golden-16",
+      "filename": "neg_sample_test_1.jpg",
+      "category": "Negative Background",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Empty asphalt road and pavement (0 false detections)"
+    },
+    {
+      "id": "golden-17",
+      "filename": "neg_sample_test_2.jpg",
+      "category": "Negative Background",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Bicycle frame and campus bike racks (0 false detections)"
+    },
+    {
+      "id": "golden-18",
+      "filename": "neg_sample_test_3.jpg",
+      "category": "Negative Background",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Campus reflective traffic signs (0 false detections)"
+    },
+    {
+      "id": "golden-19",
+      "filename": "neg_sample_test_4.jpg",
+      "category": "Negative Background",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Pedestrian turnstile and metal boom barrier arm (0 false detections)"
+    },
+    {
+      "id": "golden-20",
+      "filename": "neg_sample_test_5.jpg",
+      "category": "Negative Background",
+      "ground_truth_raw": null,
+      "ground_truth_normalized": null,
+      "expected_valid": false,
+      "expected_detection": false,
+      "challenge": "Campus foliage and pedestrian walkway (0 false detections)"
+    }
+  ]
+}
+

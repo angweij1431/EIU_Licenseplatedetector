@@ -1,0 +1,9 @@
+# Pinned Dependency Constraints for CerberusEdge Linux CPU Worker (Python 3.12)
+# Usage: pip install dist/eiu_lpr-0.1.0-py3-none-any.whl -c constraints.txt
+
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+onnxruntime==1.19.2
+fast-plate-ocr==1.1.0
+pyyaml==6.0.2
+
