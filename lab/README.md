@@ -6,6 +6,7 @@ This directory houses the historical research codebase, training notebooks, raw 
 
 ## Directory Organization
 
+- **`benchmarks/`**: Batch evaluation harness (`run_benchmarks.py`, `test_ocr.py`) and historical performance ledgers (`BENCHMARK_SUMMARY.md`).
 - **`scripts/`**: Legacy standalone scripts from the research phase (`infer.py`, `lpr_engine.py`, `main.py` FastAPI demo, `simulate_rfid.py`, `requirements.txt`).
 - **`notebooks/`**: Google Colab training and fine-tuning notebooks for YOLO detectors, CCT-XS, and legacy LPRNet.
 - **`models_legacy/`**: Raw research model weights, including intermediate PyTorch `.pt` checkpoints, legacy LPRNet ONNX models, and previous iteration weights.

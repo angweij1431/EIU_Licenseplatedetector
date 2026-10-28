@@ -13,7 +13,7 @@ except ImportError:
     psutil = None
 
 # Add src to pythonpath
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, os.path.abspath("src"))
 
 from eiu_lpr import LPRPipeline
 

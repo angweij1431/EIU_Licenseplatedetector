@@ -47,4 +47,4 @@ lab/dataset/CAR MOTOR/
 # Archive & Temporary Files
 *.zip
 *.log
-benchmarks/verify_latency.py
+lab/benchmarks/verify_latency.py

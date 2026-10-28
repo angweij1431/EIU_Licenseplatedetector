@@ -75,7 +75,9 @@ The repository enforces a strict separation between the production library (**Th
 lpr_research/
 ├── pyproject.toml              # Build definition for eiu_lpr package
 ├── demo.py                     # Standalone verification demo
-├── run_tests.py                # Automated test runner (10/10 tests)
+├── run_tests.py                # Automated test runner (11/11 tests)
+├── benchmark_linux_cpu.py      # Dedicated Linux CPU latency benchmark
+├── constraints.txt             # Pinned dependency constraints for Linux CPU
 ├── LICENSE                     # MIT License
 ├── MODEL_CARD.md               # Model specifications and limitations
 │
@@ -113,14 +115,10 @@ lpr_research/
 │   ├── test_warmup.py          # Session priming and latency checks
 │   └── test_golden_dataset.py  # 20-image regression test
 │
-├── benchmarks/                 # PERFORMANCE EVALUATION
-│   ├── benchmark_linux_cpu.py  # CPU latency percentiles (cold startup, p50, p95)
-│   ├── run_benchmarks.py       # Batch evaluation harness
-│   └── BENCHMARK_SUMMARY.md    # Historical performance ledger
-│
 ├── test_images/                # Standard test images
 │
 └── lab/                        # THE LAB: Archived Research & Prototypes
+    ├── benchmarks/             # Historical evaluation harness (run_benchmarks.py, BENCHMARK_SUMMARY.md)
     ├── scripts/                # Legacy scripts (infer.py, lpr_engine.py, main.py, simulate_rfid.py)
     ├── notebooks/              # Google Colab training notebooks
     ├── models_legacy/          # Raw research weights (.pt models, legacy ONNX)
@@ -149,7 +147,7 @@ python demo.py
 
 ### Run CPU Latency Benchmark
 ```bash
-python benchmarks/benchmark_linux_cpu.py --iterations 100
+python benchmark_linux_cpu.py --iterations 100
 ```
 
 ### Verify Checksums

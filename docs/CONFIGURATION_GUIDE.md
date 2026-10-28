@@ -22,18 +22,29 @@ Tool reference for integrating the `eiu_lpr` vision library.
 3. **`dist/`**: Pre-built wheel package.
    - `eiu_lpr-0.1.0-py3-none-any.whl`: Standalone wheel installable via `pip`.
 
-4. **`benchmarks/`**: Latency and evaluation tools.
-   - `benchmark_linux_cpu.py`: CPU latency benchmark measuring startup, detection, and OCR percentiles.
-   - `run_benchmarks.py`: Batch evaluation script across image fleets.
-   - `BENCHMARK_SUMMARY.md`: Historical benchmark performance ledger.
+4. **`benchmark_linux_cpu.py`**: Dedicated CPU latency benchmark script.
+   - Measures cold startup, steady-state detection, OCR percentiles, and hardware context.
 
-5. **`tests/` and `run_tests.py`**: Automated verification test suite.
-   - 10 unit tests verifying in-memory arrays, zero disk I/O, zero prints, split APIs, and threshold overrides.
+5. **`constraints.txt`**: Pinned dependency constraints file.
+   - Exact versions for deterministic edge Linux CPU container builds.
 
-6. **`scripts/`**: Utility scripts.
+6. **`tests/` and `run_tests.py`**: Automated verification test suite.
+   - 11 unit tests verifying in-memory arrays, zero disk I/O, zero prints, split APIs, and debug images.
+
+7. **`golden_dataset/`**: 20-image golden benchmark dataset.
+   - Verified ground truth annotations across vehicle formats, weather, and negative scenes.
+
+8. **`scripts/`**: Utility scripts.
    - `generate_checksums.py`: Recalculates SHA-256 hashes when model assets in `models/` change.
 
-7. **`demo.py`**: Standalone verification script that processes an image and prints structured JSON output.
+9. **`demo.py`**: Standalone verification script that processes an image and prints structured JSON output.
+
+10. **`lab/`**: Historical research laboratory.
+    - `lab/benchmarks/`: Batch evaluation runner and historical performance ledger (`BENCHMARK_SUMMARY.md`).
+    - `lab/scripts/`: Legacy prototypes (`infer.py`, `lpr_engine.py`, `main.py`, `simulate_rfid.py`).
+    - `lab/notebooks/`: Google Colab training notebooks.
+    - `lab/models_legacy/`: Raw PyTorch checkpoints and experimental models.
+    - `lab/research_docs/`: Early design docs, reports, and handoffs.
 
 ---
 
@@ -51,7 +62,7 @@ python run_tests.py
 
 ### Run Latency Benchmark
 ```bash
-python benchmarks/benchmark_linux_cpu.py --iterations 100
+python benchmark_linux_cpu.py --iterations 100
 ```
 
 ### Verify Model Checksums
