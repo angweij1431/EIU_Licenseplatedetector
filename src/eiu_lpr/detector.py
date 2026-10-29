@@ -59,7 +59,7 @@ class ONNXYoloDetector:
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
 
-    # Resizes and letterboxes image to target resolution while preserving aspect ratio
+    # Resizes and letterboxes image to target resolution while preserving aspect ratio 
     @staticmethod
     def _letterbox(
         image: np.ndarray,

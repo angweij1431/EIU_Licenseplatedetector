@@ -30,7 +30,7 @@ def main():
     print("   [OK] Sessions warmed up.")
 
     # Test an image
-    test_image_path = "test_images/car_test_2.jpg"
+    test_image_path = "test_images/neg_sample_test_5.jpg"
     print(f"\n3. Reading test image: {test_image_path}")
     image = cv2.imread(test_image_path)
     if image is None:
