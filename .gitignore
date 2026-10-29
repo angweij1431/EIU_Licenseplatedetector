@@ -48,3 +48,6 @@ lab/dataset/CAR MOTOR/
 *.zip
 *.log
 lab/benchmarks/verify_latency.py
+
+# Local Working Notes & Checklists
+checklist.md
