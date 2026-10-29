@@ -1,57 +1,57 @@
 {
   "dataset_version": "1.0",
   "target_standard": "Circular 24/2023/TT-BCA",
-  "description": "Golden verification dataset containing 20 curated test images across cars, dual-row motorcycles, weather conditions, acute angles, and negative background frames.",
+  "description": "Golden verification dataset containing 20 curated test images across cars, dual-row motorcycles, duplicate plates, extreme angles, and negative background/traffic frames.",
   "images": [
     {
       "id": "golden-01",
       "filename": "car_test_2.jpg",
-      "category": "Automobile",
+      "category": "Automobile (Taxi)",
       "ground_truth_raw": "30A-697.70",
       "ground_truth_normalized": "30A69770",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Standard frontal passenger car capture"
+      "challenge": "Frontal passenger car / taxi in urban traffic"
     },
     {
       "id": "golden-02",
       "filename": "car_test_4.jpg",
-      "category": "Automobile",
+      "category": "Automobile (SUV)",
       "ground_truth_raw": "51G-743.72",
       "ground_truth_normalized": "51G74372",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "High-resolution rear passenger car capture"
+      "challenge": "Front bumper plate on an off-road SUV in parking garage"
     },
     {
       "id": "golden-03",
       "filename": "car_test_5.jpg",
-      "category": "Automobile",
+      "category": "Automobile (Luxury Sedan)",
       "ground_truth_raw": "51G-777.77",
       "ground_truth_normalized": "51G77777",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Frontal sedan with repetitive digit series"
+      "challenge": "Rear view of luxury sedan with repetitive digit series (777.77)"
     },
     {
       "id": "golden-04",
       "filename": "car_test_6.jpg",
-      "category": "Commercial Truck",
-      "ground_truth_raw": "63H-903.94",
+      "category": "Motorcycle",
+      "ground_truth_raw": "63-H9 0394",
       "ground_truth_normalized": "63H90394",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Heavy logistics truck front plate"
+      "challenge": "Motorcycle rear view carrying bulky cargo (window/door frame)"
     },
     {
       "id": "golden-05",
       "filename": "car_foggy_test.jpg",
-      "category": "Adverse Weather",
+      "category": "Automobile (Duplicate Plate)",
       "ground_truth_raw": "30K-279.76",
       "ground_truth_normalized": "30K27976",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Atmospheric fog, road spray, and low contrast"
+      "challenge": "Two luxury SUVs parked side-by-side with identical duplicate plates"
     },
     {
       "id": "golden-06",
@@ -61,7 +61,7 @@
       "ground_truth_normalized": "59D242069",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Dual-row square motorcycle plate"
+      "challenge": "Dual-row square motorcycle plate captured from rear"
     },
     {
       "id": "golden-07",
@@ -71,7 +71,7 @@
       "ground_truth_normalized": "43D199999",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Dual-row motorcycle with potential D vs 0 optical confusion"
+      "challenge": "Dual-row motorcycle plate with high repetitive digits (999.99)"
     },
     {
       "id": "golden-08",
@@ -81,7 +81,7 @@
       "ground_truth_normalized": "29H133979",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Dual-row motorcycle with H letter series"
+      "challenge": "Dual-row motorcycle plate in dense multi-bike parking/store setting"
     },
     {
       "id": "golden-09",
@@ -91,67 +91,67 @@
       "ground_truth_normalized": "61H76854",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Low-resolution distant motorcycle crop requiring enhancement"
+      "challenge": "Dual-row 4-digit motorcycle plate in moving traffic"
     },
     {
       "id": "golden-10",
       "filename": "car_sample_29D.jpg",
-      "category": "Commercial Van",
+      "category": "Automobile (Hatchback)",
       "ground_truth_raw": "29D-110.77",
       "ground_truth_normalized": "29D11077",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Fleet commercial van standard capture"
+      "challenge": "Compact passenger car with commercial D-series registration"
     },
     {
       "id": "golden-11",
       "filename": "car_sample_51L.jpg",
-      "category": "Automobile",
+      "category": "Commercial Van",
       "ground_truth_raw": "51L-953.46",
       "ground_truth_normalized": "51L95346",
       "expected_valid": true,
       "expected_detection": true,
-      "challenge": "Modern registration series automobile"
+      "challenge": "Frontal delivery van with modern L-series registration"
     },
     {
       "id": "golden-12",
       "filename": "car_test_3.jpg",
-      "category": "Distant Sub-resolution",
+      "category": "Queued Traffic / Distant",
       "ground_truth_raw": "29M-6840",
       "ground_truth_normalized": "29M6840",
       "expected_valid": true,
       "expected_detection": false,
-      "challenge": "Tiny sub-resolution plate (<45px width), expected safe rejection or sub-threshold"
+      "challenge": "Vehicle queue at inspection station; foreground sedan plate sub-threshold"
     },
     {
       "id": "golden-13",
       "filename": "car_test_7.jpg",
-      "category": "Obscured Scene",
+      "category": "Motorcycle (High Angle)",
       "ground_truth_raw": null,
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Obscured vehicle landscape without readable plate"
+      "challenge": "Two touring motorcycles on highway shoulder; steep angle"
     },
     {
       "id": "golden-14",
       "filename": "car_test_8.jpg",
-      "category": "Severe Blur",
+      "category": "Motorcycle (Rural Landscape)",
       "ground_truth_raw": null,
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Severe high-speed motion blur distortion"
+      "challenge": "Motorcycle parked in rural landscape beside field and mountain"
     },
     {
       "id": "golden-15",
       "filename": "car_very_angled.jpg",
-      "category": "Extreme Angle",
+      "category": "Light Truck",
       "ground_truth_raw": null,
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Acute yaw angle (>60 degrees) exceeding perspective tolerance"
+      "challenge": "Angled driving school truck with 'TẬP LÁI' sign masking bumper plate"
     },
     {
       "id": "golden-16",
@@ -161,7 +161,7 @@
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Empty asphalt road and pavement (0 false detections)"
+      "challenge": "Open sky, clouds, and tree landscape (0 false detections)"
     },
     {
       "id": "golden-17",
@@ -171,38 +171,37 @@
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Bicycle frame and campus bike racks (0 false detections)"
+      "challenge": "Empty rural asphalt road and markings (0 false detections)"
     },
     {
       "id": "golden-18",
       "filename": "neg_sample_test_3.jpg",
-      "category": "Negative Background",
+      "category": "Negative Background (Traffic Clutter)",
       "ground_truth_raw": null,
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Campus reflective traffic signs (0 false detections)"
+      "challenge": "Massive city traffic jam gridlock with heavy visual clutter"
     },
     {
       "id": "golden-19",
       "filename": "neg_sample_test_4.jpg",
-      "category": "Negative Background",
+      "category": "Negative Background (Crowd Flow)",
       "ground_truth_raw": null,
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Pedestrian turnstile and metal boom barrier arm (0 false detections)"
+      "challenge": "Dense oncoming commuter motorcycle flow on city avenue"
     },
     {
       "id": "golden-20",
       "filename": "neg_sample_test_5.jpg",
-      "category": "Negative Background",
+      "category": "Negative Background (Rush Hour)",
       "ground_truth_raw": null,
       "ground_truth_normalized": null,
       "expected_valid": false,
       "expected_detection": false,
-      "challenge": "Campus foliage and pedestrian walkway (0 false detections)"
+      "challenge": "Dense rush hour street crowd with helmeted riders"
     }
   ]
 }
-
