@@ -408,7 +408,7 @@ result = pipeline.process(frame, color_format="BGR", request_id="req-101")
 payload = result.to_dict(minimal=True)
 ```
 
-#### Terminal Execution Command
+#### Optional Quick Terminal Test
 ```bash
 python -c "import cv2, json; from eiu_lpr import LPRPipeline; p = LPRPipeline('models/detector.onnx', 'models/cct_xs.onnx', 'models/cct_xs_plate_config.yaml'); img = cv2.imread('test_images/car_sample_29D.jpg'); res = p.process(img, color_format='BGR', request_id='req-101'); print(json.dumps(res.to_dict(minimal=True), indent=2))"
 ```
@@ -448,7 +448,7 @@ if boxes:
     print(f"Plate: {candidate.normalized_text} | Conf: {candidate.ocr_confidence:.1%}")
 ```
 
-#### Terminal Execution Command
+#### Optional Quick Terminal Test
 ```bash
 python -c "import cv2; from eiu_lpr import LPRPipeline; p = LPRPipeline('models/detector.onnx', 'models/cct_xs.onnx', 'models/cct_xs_plate_config.yaml'); img = cv2.imread('test_images/car_sample_29D.jpg'); boxes = p.detect(img, color_format='BGR'); cand = p.read_plate(img, boxes[0], color_format='BGR'); print(f'Plate: {cand.normalized_text} | Conf: {cand.ocr_confidence:.1%}')"
 ```
@@ -471,7 +471,7 @@ annotated_frame = result.annotated_image  # np.ndarray [H, W, 3] uint8 in RAM
 annotated_frame = pipeline.annotate(frame, result.candidates)
 ```
 
-#### Terminal Execution Command
+#### Optional Quick Terminal Test
 ```bash
 python -c "import cv2; from eiu_lpr import LPRPipeline; p = LPRPipeline('models/detector.onnx', 'models/cct_xs.onnx', 'models/cct_xs_plate_config.yaml'); img = cv2.imread('test_images/car_sample_29D.jpg'); res = p.process(img, color_format='BGR', include_annotated_image=True); print('Shape:', res.annotated_image.shape, '| Dtype:', res.annotated_image.dtype)"
 ```
@@ -492,7 +492,7 @@ for i, candidate in enumerate(result.candidates):
     crop_array = candidate.debug_crop  # np.ndarray [H, W, 3] uint8 in RAM
 ```
 
-#### Terminal Execution Command
+#### Optional Quick Terminal Test
 ```bash
 python -c "import cv2; from eiu_lpr import LPRPipeline; p = LPRPipeline('models/detector.onnx', 'models/cct_xs.onnx', 'models/cct_xs_plate_config.yaml'); img = cv2.imread('test_images/car_sample_29D.jpg'); res = p.process(img, color_format='BGR', include_debug_crop=True); top = res.candidates[0]; print('Crop Shape:', top.debug_crop.shape, '| Pass Level:', top.pass_level)"
 ```
@@ -511,7 +511,7 @@ Crop Shape: (115, 329, 3) | Pass Level: base_640px
 candidates = pipeline.recognize(frame, color_format="BGR", detection_threshold=0.10)
 ```
 
-#### Terminal Execution Command
+#### Optional Quick Terminal Test
 ```bash
 python -c "import cv2; from eiu_lpr import LPRPipeline; p = LPRPipeline('models/detector.onnx', 'models/cct_xs.onnx', 'models/cct_xs_plate_config.yaml', detection_threshold=0.50); img = cv2.imread('test_images/car_sample_29D.jpg'); res_default = p.detect(img, color_format='BGR'); res_override = p.detect(img, color_format='BGR', detection_threshold=0.10); print(f'Default (0.50): {len(res_default)} | Override (0.10): {len(res_override)}')"
 ```
@@ -550,7 +550,7 @@ This section maps each requirement from the CerberusEdge integration specificati
 * **In-Memory Frame Processing** (`src/eiu_lpr/preprocessor.py`, `src/eiu_lpr/pipeline.py`): Accepts standard `uint8` 3D NumPy arrays directly from memory; converts BGR to RGB in RAM without filesystem interaction.
 * **Constructor Dependency Injection** (`src/eiu_lpr/pipeline.py`): All asset paths and thresholds are passed directly into `__init__()`. Never resolves paths relative to `os.getcwd()`, preventing container path failures.
 * **Zero-Disk-I/O Policy** (`src/eiu_lpr/pipeline.py`): Removed all directory creations and `cv2.imwrite` disk writes. Preserves flash storage lifespan and eliminates filesystem latency.
-* **Privacy-Preserving Logging** (`src/eiu_lpr/models.py`): Removed all plate text print statements; candidate `__repr__` suppresses raw plate strings to protect vehicle PII in telemetry logs.
+* **Privacy-Preserving Logging** (`src/eiu_lpr/models.py`): Removed all internal print statements. `candidate.__repr__` masks middle characters (e.g. `'30A****0'`) to prevent leaking vehicle PII in console or telemetry logs, while leaving `candidate.normalized_text`, `candidate.raw_text`, and `result.to_dict()` 100% complete and unmasked.
 * **Input Validation & Non-Mutation** (`src/eiu_lpr/preprocessor.py`): Rejects non-arrays, empty frames, and invalid dtypes with `InvalidInputError`. Never mutates caller array memory in-place.
 
 ---

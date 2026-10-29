@@ -60,6 +60,21 @@ class PlateCandidate:
     pass_level: str = "base_640px"
     debug_crop: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
 
+    def __repr__(self) -> str:
+        # Protects vehicle PII in console/telemetry logs by masking plate text.
+        # Full plate text remains accessible via self.normalized_text, self.raw_text, and self.to_dict().
+        if len(self.normalized_text) >= 4:
+            masked = f"{self.normalized_text[:3]}****{self.normalized_text[-1:]}"
+        elif self.normalized_text:
+            masked = "***"
+        else:
+            masked = ""
+        box = [int(round(c)) for c in self.bbox]
+        return (
+            f"PlateCandidate(bbox={box}, plate='{masked}', "
+            f"conf={self.ocr_confidence:.2f}, is_valid={self.is_valid})"
+        )
+
     # Convert candidate to dictionary matching CerberusEdge JSON schema
     def to_dict(self, minimal: bool = False) -> Dict[str, Any]:
         data: Dict[str, Any] = {
