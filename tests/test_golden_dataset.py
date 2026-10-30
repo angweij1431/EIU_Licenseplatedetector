@@ -56,11 +56,17 @@ class TestGoldenDataset(unittest.TestCase):
                 )
                 passed_reads += 1
             elif not item["expected_detection"]:
-                # Negative or challenging cases should either return 0 candidates or invalid/low-conf candidates
+                # Negative or challenging cases should either return 0 candidates or safely rejected (invalid/low-conf) candidates
                 if len(candidates) == 0:
                     safe_rejections += 1
                 else:
-                    # If detected, must be low confidence or invalid
+                    # If detected, all candidates must be flagged invalid or below confidence threshold
+                    all_rejected = all(not cand.is_valid for cand in candidates)
+                    self.assertTrue(
+                        all_rejected,
+                        f"False positive leak in negative sample {item['filename']}: "
+                        f"detected valid candidate {[c.normalized_text for c in candidates if c.is_valid]}"
+                    )
                     safe_rejections += 1
 
         self.assertGreaterEqual(passed_reads, 10)

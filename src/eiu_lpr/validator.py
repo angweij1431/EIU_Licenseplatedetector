@@ -11,12 +11,14 @@ class VietnamPlateValidator:
     # Examples: 59D242069, 63H90394, 77C144470, 59VA24003
     MOTO_PATTERN = re.compile(r'^[1-9][0-9]([A-Z][0-9]|[A-Z]{2})[0-9]{4,6}$')
 
-    # Normalization: uppercase, remove non-alphanumerics, keep order, no ambiguous substitution
+    # Normalization: uppercase, canonicalize Vietnamese diacritic 'Đ' -> 'D', remove non-alphanumerics
     @staticmethod
     def normalize_text(raw_text: str) -> str:
         if not raw_text:
             return ""
-        return re.sub(r'[^A-Z0-9]', '', raw_text.upper())
+        # Canonicalize Vietnamese keyboard / OCR diacritic Đ (\u0110, \u0111) to standard ASCII D
+        clean_text = raw_text.upper().replace('Đ', 'D')
+        return re.sub(r'[^A-Z0-9]', '', clean_text)
 
     # Check plate against official regex standards
     @classmethod

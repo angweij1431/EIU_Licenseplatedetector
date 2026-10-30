@@ -16,6 +16,7 @@ from eiu_lpr import (
     ModelNotFoundError,
     PlateCandidate,
 )
+from eiu_lpr.validator import VietnamPlateValidator
 
 DETECTOR_PATH = "models/detector.onnx"
 OCR_PATH = "models/cct_xs.onnx"
@@ -112,6 +113,19 @@ class TestInMemoryAPI(unittest.TestCase):
                 ocr_config_path=OCR_CONFIG,
                 detection_threshold=1.5,
             )
+
+    def test_vietnamese_d_diacritic_normalization(self):
+        # Case 1: Uppercase Đ in plate (e.g. 43-Đ1 420.69)
+        res1 = VietnamPlateValidator.validate("43-Đ1 420.69")
+        self.assertEqual(res1["normalized_text"], "43D142069")
+        self.assertTrue(res1["is_valid"])
+        self.assertEqual(res1["raw_text"], "43-Đ1 420.69")
+
+        # Case 2: Lowercase đ in automobile plate (e.g. 30-đ 697.70)
+        res2 = VietnamPlateValidator.validate("30-đ 697.70")
+        self.assertEqual(res2["normalized_text"], "30D69770")
+        self.assertTrue(res2["is_valid"])
+        self.assertEqual(res2["vehicle_type"], "automobile")
 
 
 if __name__ == "__main__":

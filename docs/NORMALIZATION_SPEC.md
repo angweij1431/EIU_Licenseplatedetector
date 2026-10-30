@@ -8,12 +8,13 @@ Reference Module: `src/eiu_lpr/validator.py`
 The raw optical character recognition (OCR) text is normalized through the following sequence:
 
 1. **Uppercase Transformation**: All alphabetical characters are converted to standard uppercase.
-2. **Non-Alphanumeric Removal**: All spaces, hyphens (`-`), periods (`.`), rivets, underscores (`_`), and newline characters (`\n`) are removed.
-3. **Line Order Preservation**: Dual-line motorcycle plates are joined sequentially from top line to bottom line.
-4. **Character Fidelity Note**: No form of manual substitution is made in the normalization function (such as swapping between letter 'O' and digit '0').
+2. **Vietnamese Diacritic Canonicalization**: The Vietnamese character `Đ` (`\u0110`, often predicted by OCR models on plates with mounting rivets or horizontal scratches across the letter `D`) is mapped to standard ASCII `D`. Raw evidence is preserved in `raw_plate` and `character_details`.
+3. **Non-Alphanumeric Removal**: All spaces, hyphens (`-`), periods (`.`), rivets, underscores (`_`), and newline characters (`\n`) are removed.
+4. **Line Order Preservation**: Dual-line motorcycle plates are joined sequentially from top line to bottom line.
+5. **Character Fidelity Note**: Outside of standardizing `Đ` to canonical `D`, no ambiguous character substitution is made in the normalization function (such as swapping between letter 'O' and digit '0').
 
 ### Rationale
-Automated character swapping can corrupt valid readings or hide visual ambiguity. By returning the exact recognized characters alongside per-character softmax probability arrays, downstream systems have full visual evidence to evaluate ambiguous characters against vehicle records.
+Automated character swapping can corrupt valid readings or hide visual ambiguity. By returning the exact recognized characters alongside per-character softmax probability arrays, downstream systems have full visual evidence to evaluate ambiguous characters against vehicle records. Meanwhile, canonicalizing `Đ` to `D` ensures that plates with rivet noise or OCR diacritic bias match standard vehicle registration databases and Circular 24/2023 syntax patterns without destroying the series letter.
 
 ## 2. Regulatory Syntax Patterns
 

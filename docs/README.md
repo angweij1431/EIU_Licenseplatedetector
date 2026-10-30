@@ -574,7 +574,8 @@ This section maps each requirement from the CerberusEdge integration specificati
 ### Canonical Normalisation and Validation Rules
 
 * **Circular 24/2023 Compliance** (`src/eiu_lpr/validator.py`): Strips punctuation, joins two-line motorcycle plates top-to-bottom, and verifies province codes and series patterns.
-* **Zero Heuristic Character Mutation** (`src/eiu_lpr/validator.py`): Avoids letter-to-digit swapping (`O` <-> `0`). Ambiguities are exposed through `character_details` softmax probabilities for backend database matching.
+* **Vietnamese Diacritic Canonicalization** (`src/eiu_lpr/validator.py`): Maps Vietnamese `Đ` (`\u0110`, often produced when rivets or scratches traverse the letter `D`) to canonical ASCII `D` so plates match backend registration databases and Circular 24 series regexes, while retaining raw evidence in `raw_plate` and `character_details`.
+* **Zero Heuristic Ambiguity Mutation** (`src/eiu_lpr/validator.py`): Avoids letter-to-digit swapping (`O` <-> `0`). Ambiguities are exposed through `character_details` softmax probabilities for backend database matching.
 
 ---
 
