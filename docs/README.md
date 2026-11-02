@@ -5,8 +5,8 @@
 The `eiu_lpr` library is a standalone, in-memory Automatic License Plate Recognition (ALPR) package designed for edge deployments on CerberusEdge smart parking worker nodes. It processes raw camera frames directly in memory, performs license plate detection and character recognition using pure Open Neural Network Exchange (ONNX) Runtime, and returns structured metadata without writing temporary files to disk.
 
 ### Deliverables in This Repository
-* **Package Wheel**: `dist/eiu_lpr-0.1.0-py3-none-any.whl` (compiled distribution package).
-* **Detector Model**: `models/detector.onnx` (YOLO11n model trained for vehicle plate detection).
+* **Package Wheel**: `dist/eiu_lpr-0.2.0-py3-none-any.whl` (compiled distribution package).
+* **Detector Model**: `models/detector.onnx` (Megvii YOLOX-Nano model trained for vehicle plate detection).
 * **Recognizer Model**: `models/cct_xs.onnx` (Compact Vision Transformer OCR model).
 * **Recognizer Configuration**: `models/cct_xs_plate_config.yaml` (character dictionary and normalization settings).
 * **Dependency Constraints**: `constraints.txt` (pinned dependencies for Python 3.10 to 3.12).
@@ -18,7 +18,7 @@ The `eiu_lpr` library is a standalone, in-memory Automatic License Plate Recogni
 
 1. **Install Package Dependencies**
    ```bash
-   pip install dist/eiu_lpr-0.1.0-py3-none-any.whl -c constraints.txt
+   pip install dist/eiu_lpr-0.2.0-py3-none-any.whl -c constraints.txt
    ```
    * *Decision*: Pinned constraints prevent binary incompatibilities across numpy, opencv-python-headless, and onnxruntime.
 
@@ -202,7 +202,7 @@ class PipelineResult:
     processing_time_ms: float
     status: str = "OK"
     schema_version: str = "1.0"
-    model_version: str = "alpr-v0.1"
+    model_version: str = "alpr-v0.2"
     request_id: Optional[str] = None
     annotated_image: Optional[np.ndarray] = None
 ```
@@ -217,7 +217,7 @@ class PipelineResult:
 | **`candidates`** | `list` | `[PlateCandidate, ...]` | List of detected plate objects. Returns an empty list (`[]`) if no plate is detected in the image. Ordered by detector confidence (`candidates[0]` is the top candidate). |
 | **`processing_time_ms`** | `float` | `>= 0.0` | Total wall-clock processing latency for the frame in milliseconds. |
 | **`schema_version`** | `str` | `"1.0"` | JSON schema version compatibility identifier. |
-| **`model_version`** | `str` | `"alpr-v0.1"` | Model bundle version identifier for telemetry auditing. |
+| **`model_version`** | `str` | `"alpr-v0.2"` | Model bundle version identifier for telemetry auditing. |
 | **`request_id`** | `str` \| `null` | String or `None` | Client tracking identifier passed back unchanged for end-to-end event tracing. |
 | **`annotated_image`** | `ndarray` \| `null` | `[H, W, 3] uint8` | Visualization with drawn boxes and labels. Populated in memory only if `include_annotated_image=True`. Never serialized into JSON. |
 | **`plate`** | `str` | e.g. `"29D11077"` | Canonicalized plate string formatted according to Vietnam Circular 24/2023 regulations. Used for database lookups and whitelist verification. |
@@ -251,7 +251,7 @@ class PipelineResult:
       "bbox": [556, 1148, 874, 1319]
     }
   ],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 38.42
 }
 ```
@@ -264,7 +264,7 @@ class PipelineResult:
   "request_id": "gate-entry-02",
   "status": "OK",
   "candidates": [],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 14.18
 }
 ```
@@ -295,7 +295,7 @@ class PipelineResult:
       "pass_level": "base_640px"
     }
   ],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 39.15
 }
 ```
@@ -378,7 +378,7 @@ class LPRPipeline:
 * **`ocr_min_threshold`** (`float`, default: `0.50`, range: `[0.0, 1.0]`): Minimum softmax probability for the lowest-scoring character. Used to detect ambiguous characters without altering raw text.
 * **`enable_adaptive_enhancement`** (`bool`, default: `True`): Toggles adaptive CLAHE and glare attenuation for small (`< 110x60` px) or blurry (Laplacian variance `< 150.0`) crops.
 * **`intra_op_threads`** (`Optional[int]`, default: `None`): CPU threads allocated to ONNX Runtime. Set to `None` for dedicated single workers; set to `2` in multi-worker environments to prevent core contention.
-* **`model_version`** & **`schema_version`** (`str`, defaults: `"alpr-v0.1"`, `"1.0"`): Telemetry identifiers attached to outgoing results.
+* **`model_version`** & **`schema_version`** (`str`, defaults: `"alpr-v0.2"`, `"1.0"`): Telemetry identifiers attached to outgoing results.
 
 ---
 
@@ -427,7 +427,7 @@ python -c "import cv2, json; from eiu_lpr import LPRPipeline; p = LPRPipeline('m
       "bbox": [994, 1247, 1299, 1354]
     }
   ],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 360.33
 }
 ```
@@ -546,7 +546,7 @@ This section maps each requirement from the CerberusEdge integration specificati
 
 ### Packaging and In-Memory Execution Contract
 
-* **Wheel Packaging & Python 3.12** (`pyproject.toml`, `dist/eiu_lpr-0.1.0-py3-none-any.whl`): Configured packaging metadata and compiled a self-contained wheel artifact for zero-source deployment.
+* **Wheel Packaging & Python 3.12** (`pyproject.toml`, `dist/eiu_lpr-0.2.0-py3-none-any.whl`): Configured packaging metadata and compiled a self-contained wheel artifact for zero-source deployment.
 * **In-Memory Frame Processing** (`src/eiu_lpr/preprocessor.py`, `src/eiu_lpr/pipeline.py`): Accepts standard `uint8` 3D NumPy arrays directly from memory; converts BGR to RGB in RAM without filesystem interaction.
 * **Constructor Dependency Injection** (`src/eiu_lpr/pipeline.py`): All asset paths and thresholds are passed directly into `__init__()`. Never resolves paths relative to `os.getcwd()`, preventing container path failures.
 * **Zero-Disk-I/O Policy** (`src/eiu_lpr/pipeline.py`): Removed all directory creations and `cv2.imwrite` disk writes. Preserves flash storage lifespan and eliminates filesystem latency.

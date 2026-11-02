@@ -56,7 +56,7 @@ Normalized text is validated against Circular 24/2023 patterns:
       "pass_level": "enhanced_crop"
     }
   ],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 68.45
 }
 ```
@@ -85,7 +85,7 @@ Normalized text is validated against Circular 24/2023 patterns:
       "is_valid": true
     }
   ],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 94.12
 }
 ```
@@ -97,7 +97,7 @@ Normalized text is validated against Circular 24/2023 patterns:
   "request_id": "req-003",
   "status": "OK",
   "candidates": [],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 42.10
 }
 ```
@@ -130,7 +130,7 @@ When a box is detected but fails Vietnamese regulatory regex (e.g. partial plate
       "pass_level": "base_640px"
     }
   ],
-  "model_version": "alpr-v0.1",
+  "model_version": "alpr-v0.2",
   "processing_time_ms": 55.30
 }
 ```

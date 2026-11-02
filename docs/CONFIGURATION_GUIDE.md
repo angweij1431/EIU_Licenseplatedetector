@@ -20,7 +20,7 @@ Tool reference for integrating the `eiu_lpr` vision library.
    - `checksums.sha256`: SHA-256 cryptographic hashes for release verification.
 
 3. **`dist/`**: Pre-built wheel package.
-   - `eiu_lpr-0.1.0-py3-none-any.whl`: Standalone wheel installable via `pip`.
+   - `eiu_lpr-0.2.0-py3-none-any.whl`: Standalone wheel installable via `pip`.
 
 4. **`benchmark_linux_cpu.py`**: Dedicated CPU latency benchmark script.
    - Measures cold startup, steady-state detection, OCR percentiles, and hardware context.
@@ -52,7 +52,7 @@ Tool reference for integrating the `eiu_lpr` vision library.
 
 ### Package Installation
 ```bash
-pip install eiu_lpr-0.1.0-py3-none-any.whl
+pip install eiu_lpr-0.2.0-py3-none-any.whl
 ```
 
 ### Run Test Suite
@@ -167,7 +167,7 @@ pipeline = LPRPipeline(
     ocr_mean_threshold=0.70,
     ocr_min_threshold=0.50,
     intra_op_threads=None,
-    model_version="alpr-v0.1",
+    model_version="alpr-v0.2",
     schema_version="1.0",
 )
 ```
@@ -183,7 +183,7 @@ pipeline = LPRPipeline(
 | `ocr_mean_threshold` | `float` | `0.70` | Expected mean character confidence score. |
 | `ocr_min_threshold` | `float` | `0.50` | Lowest acceptable character probability threshold. |
 | `intra_op_threads` | `int` | `None` | Optional CPU core limit for ONNX Runtime. |
-| `model_version` | `str` | `"alpr-v0.1"` | Model version tag included in telemetry output. |
+| `model_version` | `str` | `"alpr-v0.2"` | Model version tag included in telemetry output. |
 | `schema_version` | `str` | `"1.0"` | Schema version tag included in telemetry output. |
 
 ### Available Methods

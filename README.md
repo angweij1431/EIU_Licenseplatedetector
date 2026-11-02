@@ -12,7 +12,7 @@ Designed for edge worker integration (e.g., CerberusEdge) running Python 3.12 on
 Install the pre-built standalone wheel package:
 
 ```bash
-pip install dist/eiu_lpr-0.1.0-py3-none-any.whl
+pip install dist/eiu_lpr-0.2.0-py3-none-any.whl
 ```
 
 ### Basic Usage
@@ -60,8 +60,8 @@ print(result.to_dict(minimal=True))
       "bbox": [178, 234, 242, 266]
     }
   ],
-  "model_version": "alpr-v0.1",
-  "processing_time_ms": 65.2
+  "model_version": "alpr-v0.2",
+  "processing_time_ms": 65.4
 }
 ```
 
@@ -83,7 +83,7 @@ lpr_research/
 │
 ├── src/eiu_lpr/                # THE FACTORY: Clean Production Package
 │   ├── pipeline.py             # LPRPipeline orchestrator
-│   ├── detector.py             # Pure ONNX Runtime YOLO detector (NumPy letterbox & NMS)
+│   ├── detector.py             # Pure ONNX Runtime Megvii YOLOX-Nano detector (decoupled head)
 │   ├── recognizer.py           # CCT-XS ONNX OCR recognizer
 │   ├── preprocessor.py         # Dynamic 4% padding and adaptive enhancement
 │   ├── validator.py            # Circular 24/2023 syntax validation
@@ -91,15 +91,24 @@ lpr_research/
 │   └── exceptions.py           # Custom exceptions (InvalidInputError, ModelNotFoundError)
 │
 ├── models/                     # THE ASSETS: Frozen Release Weights & Checksums
-│   ├── detector.onnx           # Plate detection weights (10.9 MB)
-│   ├── cct_xs.onnx             # Plate OCR weights (3.3 MB)
+│   ├── detector.onnx           # Plate detection weights (8.67 MB, Apache 2.0)
+│   ├── cct_xs.onnx             # Plate OCR weights (3.2 MB, MIT)
 │   ├── cct_xs_plate_config.yaml# Alphabet vocabulary and input configuration
 │   └── checksums.sha256        # SHA-256 cryptographic verification manifest
 │
 ├── dist/                       # DISTRIBUTION: Pre-built wheels
-│   └── eiu_lpr-0.1.0-py3-none-any.whl
+│   └── eiu_lpr-0.2.0-py3-none-any.whl
+│
+├── training/                   # TRAINING: Model Training Pipelines
+│   ├── 01_train_yolox_nano.ipynb # End-to-end Google Colab fine-tuning notebook
+│   └── README.md               # Training methodology and dataset documentation
+│
+├── scripts/                    # UTILITIES
+│   ├── compare_models.py       # Side-by-side performance and confidence benchmark
+│   └── generate_checksums.py   # Checksum generator
 │
 ├── docs/                       # DOCUMENTATION
+│   ├── RELEASE_NOTES_v0.2.0.md # Release notes and migration changelog
 │   ├── CONFIGURATION_GUIDE.md  # Configuration options, directory reference, and APIs
 │   ├── INTEGRATION_HANDBOOK.md # Operational FAQs, integration patterns, versioning guide
 │   ├── NORMALIZATION_SPEC.md   # Circular 24/2023 normalization rules
@@ -133,6 +142,7 @@ lpr_research/
 ### Run Test Suite
 ```bash
 python run_tests.py
+# or: pytest tests/ -v
 ```
 
 ### Run Golden Dataset Regression
@@ -150,6 +160,11 @@ python demo.py
 python benchmark_linux_cpu.py --iterations 100
 ```
 
+### Run Side-by-Side Model Comparison
+```bash
+python scripts/compare_models.py
+```
+
 ### Verify Checksums
 On Linux:
 ```bash
@@ -164,8 +179,9 @@ Get-FileHash models/detector.onnx -Algorithm SHA256
 
 ## 4. Documentation Index
 
-- [Configuration Guide](file:///c:/Users/User/EIU_OITP/lpr_research/docs/CONFIGURATION_GUIDE.md): Parameters, thresholds, and full method signatures.
-- [Integration Handbook](file:///c:/Users/User/EIU_OITP/lpr_research/docs/INTEGRATION_HANDBOOK.md): Operational FAQs, troubleshooting, and step-by-step versioning runbook.
-- [Normalization Specification](file:///c:/Users/User/EIU_OITP/lpr_research/docs/NORMALIZATION_SPEC.md): Vietnamese Ministry of Public Security Circular 24/2023/TT-BCA syntax rules.
-- [Model Card](file:///c:/Users/User/EIU_OITP/lpr_research/MODEL_CARD.md): YOLO11n + CCT-XS architectures, resolutions, and operational limitations.
-- [Golden Dataset Specification](file:///c:/Users/User/EIU_OITP/lpr_research/docs/GOLDEN_DATASET.md): 20 verified reference images and expected values.
+- [Release Notes v0.2.0](docs/RELEASE_NOTES_v0.2.0.md): Migration changelog, benchmarks, and known edge-case trade-offs.
+- [Configuration Guide](docs/CONFIGURATION_GUIDE.md): Parameters, thresholds, and full method signatures.
+- [Integration Handbook](docs/INTEGRATION_HANDBOOK.md): Operational FAQs, troubleshooting, and step-by-step versioning runbook.
+- [Normalization Specification](docs/NORMALIZATION_SPEC.md): Vietnamese Ministry of Public Security Circular 24/2023/TT-BCA syntax rules.
+- [Model Card](MODEL_CARD.md): Megvii YOLOX-Nano + CCT-XS architectures, resolutions, and operational limitations.
+- [Golden Dataset Specification](docs/GOLDEN_DATASET.md): 20 verified reference images and expected values.

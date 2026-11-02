@@ -11,10 +11,10 @@ Release 0.2.0 replaces the baseline plate detector with a Megvii YOLOX-Nano mode
 
 ### 1. Licensing and Compliance
 - Replaced Ultralytics YOLO11n (AGPL-3.0) with Megvii YOLOX-Nano (Apache 2.0).
-- Eliminates copyleft obligations, allowing closed-source proprietary distribution.
+- Prevents copyleft obligations, allowing closed-source proprietary distribution.
 
 ### 2. Detection Engine Architecture
-- Model Architecture: Megvii YOLOX-Nano (depth factor 0.33, width factor 0.25, approximately 0.91 million parameters).
+- Model Architecture: Megvii YOLOX-Nano (depth factor 0.33, width factor 0.25, approximately ~0.91 million parameters). trained up till 40 EPOCHS
 - Model Format: Open Neural Network Exchange (ONNX) format with in-graph inference decoding (`decode_in_inference = True`).
 - Output Tensor Shape: `[1, 8400, 6]` containing bounding box coordinates `(x, y, w, h)`, objectness score, and class confidence.
 - Scoring Formula: Detection confidence is calculated as the product of objectness and class score (`obj_score * cls_score`).
@@ -24,17 +24,26 @@ Release 0.2.0 replaces the baseline plate detector with a Megvii YOLOX-Nano mode
   - Letterbox alignment: Top-left padding with fill value 114.
 
 ### 3. Benchmark and Latency Metrics
-Evaluated on x86_64 CPU (ONNX Runtime, 50 warm iterations):
+Evaluated on x86_64 CPU (ONNX Runtime, 50 warm iterations) (on wsl environment ubuntu):
 - Model File Size: 8.67 MB (17 percent reduction from 10.48 MB).
-- Detector CPU Latency: Mean 48.2 ms (compared to 51.6 ms baseline, approximately 7 to 15 percent faster).
+- Detector CPU Latency: Mean 48.2 ms (compared to 51.6 ms baseline).
 - Pipeline End-to-End Latency: Mean 76.7 ms (median p50: 73.9 ms).
 - Cold Start Initialization: 278.1 ms.
 - Motorcycle Recall: Higher confidence across motorcycle test samples (e.g. `bike_test_9.jpg`: 0.879 to 0.912).
 - False Positive Suppression: False detections on non-plate background samples reduced significantly (e.g. `neg_sample_test_4.jpg`: 0.451 down to 0.001).
 
-### 4. Known Edge-Case Trade-offs
+### 4. Known Edge-Case Trade-offs (to consider)
 - Low-Contrast and Foggy Conditions: Low-contrast scenes (`car_foggy_test.jpg`) yield lower objectness confidence (0.047) compared to coupled heads. Low-light deployments should utilize Contrast Limited Adaptive Histogram Equalization (CLAHE) preprocessing or lower the detection threshold to 0.10.
 - Plate-Like Distractor Signs: Rectangular rooftop signs ("TẬP LÁI") on driving school vehicles can trigger candidate proposals. The downstream Compact Convolutional Transformer (CCT-XS) Optical Character Recognition (OCR) engine and syntax validator safely flag these candidates as invalid (`is_valid: False`), preventing invalid barrier gate operations.
+
+
+
+
+- As a result, we may need to continue fine-tuning YOLOX with either: more epochs, add negative samples of similar-shaped things resembling license plates, and more data with challenging angles and environment / lighting conditions.
+
+- Additionally, in general, standard yolo pipelines with ultralytics like YOLO11, assumes: RGB channel ordering, centered letterbox paddding, and normalised floating points. 
+- However with yolox, it requires: BGR channel ordering, top left letterbox padding, and unnormalised floating point numbers (float32 tensors)
+- **note for users and backend** - It is important to **read detector.py** since the code here validates input formats and converts RGB to native BGR, applies top left letterbox paddding, keeps tensors to float32 without /255, and correctly decodes decoupled head w/ obj*cls.
 
 ## Release Checksums (SHA-256)
 - `models/detector.onnx`: `8c303c836e1abbcb336e514dda4999fd69c770c4b683be617d9c32998dead8e6`
@@ -43,3 +52,4 @@ Evaluated on x86_64 CPU (ONNX Runtime, 50 warm iterations):
 
 ## Verification
 - Test Suite: 13 of 13 tests passing (100 percent pass rate via `pytest tests/ -v`).
+
