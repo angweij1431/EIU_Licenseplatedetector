@@ -16,6 +16,7 @@ env/
 !models/cct_xs.onnx
 !models/cct_xs_plate_config.yaml
 !models/checksums.sha256
+models/archive/
 
 # Allow Specific Legacy Research Weights in Lab
 !lab/models_legacy/Models_ocr/cct_xs.onnx

@@ -1,4 +1,4 @@
-# Direct ONNX Runtime YOLO Detector with pure NumPy preprocessing and NMS
+# Direct ONNX Runtime YOLOX Detector with pure NumPy preprocessing and NMS
 import os
 from typing import List, Optional, Tuple
 import cv2
@@ -21,7 +21,7 @@ def _resolve_model_path(path: str) -> str:
 
 
 class ONNXYoloDetector:
-    # Pure ONNX Runtime YOLO object detector without ultralytics imports
+    # Pure ONNX Runtime YOLOX object detector without ultralytics imports
     def __init__(
         self,
         model_path: str,
@@ -59,29 +59,22 @@ class ONNXYoloDetector:
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
 
-    # Resizes and letterboxes image to target resolution while preserving aspect ratio 
+    # Resizes image with top-left aspect ratio padding for YOLOX
     @staticmethod
     def _letterbox(
         image: np.ndarray,
         target_size: Tuple[int, int] = (640, 640),
         fill_value: int = 114,
-    ) -> Tuple[np.ndarray, float, float, float]:
+    ) -> Tuple[np.ndarray, float]:
         h, w = image.shape[:2]
         tw, th = target_size
         scale = min(th / h, tw / w)
         nh, nw = int(round(h * scale)), int(round(w * scale))
         resized = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_LINEAR)
 
-        pad_w = (tw - nw) / 2.0
-        pad_h = (th - nh) / 2.0
-        top, bottom = int(round(pad_h - 0.1)), int(round(pad_h + 0.1))
-        left, right = int(round(pad_w - 0.1)), int(round(pad_w + 0.1))
-
-        canvas = cv2.copyMakeBorder(
-            resized, top, bottom, left, right,
-            cv2.BORDER_CONSTANT, value=(fill_value, fill_value, fill_value)
-        )
-        return canvas, scale, float(left), float(top)
+        canvas = np.full((th, tw, 3), fill_value, dtype=np.uint8)  # YOLOX aligns content to top-left
+        canvas[:nh, :nw] = resized
+        return canvas, scale
 
     # Pure NumPy vectorized Non-Maximum Suppression
     @staticmethod
@@ -136,32 +129,24 @@ class ONNXYoloDetector:
         if h0 == 0 or w0 == 0:
             return []
 
-        # Convert BGR to RGB if passed from OpenCV
-        if color_format.upper() == "BGR":
-            work_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        elif color_format.upper() == "RGB":
-            work_img = image
-        else:
+        fmt = color_format.upper()
+        if fmt not in ("RGB", "BGR"):
             raise InvalidInputError(f"Unsupported color_format '{color_format}'. Must be 'RGB' or 'BGR'.")
 
-        canvas, scale, pad_x, pad_y = self._letterbox(work_img, target_size=self.input_size)
+        work_img = image if fmt == "BGR" else cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # YOLOX expects BGR order
+        canvas, scale = self._letterbox(work_img, target_size=self.input_size)
 
-        # Preprocessing: [H, W, C] -> [1, C, H, W] normalized to [0, 1]
-        blob = np.ascontiguousarray(canvas, dtype=np.float32) / 255.0
-        blob = np.transpose(blob, (2, 0, 1))[np.newaxis, ...]
+        blob = np.transpose(canvas, (2, 0, 1))[np.newaxis, ...]  # Preprocessing: [H, W, C] -> [1, C, H, W]
+        blob = np.ascontiguousarray(blob, dtype=np.float32)  # YOLOX expects [0, 255] float32
 
         try:
             outputs = self.session.run([self.output_name], {self.input_name: blob})
         except Exception as e:
             raise ModelInferenceError(f"Inference session execution failed: {e}") from e
 
-        # YOLO output is [batch, 5, 8400] -> transpose to [8400, 5]
-        preds = outputs[0][0].T
-        cx = preds[:, 0]
-        cy = preds[:, 1]
-        bw = preds[:, 2]
-        bh = preds[:, 3]
-        scores = preds[:, 4]
+        preds = outputs[0][0]  # YOLOX layout: [8400, 6] (cx, cy, bw, bh, obj_conf, cls_conf)
+        cx, cy, bw, bh = preds[:, 0], preds[:, 1], preds[:, 2], preds[:, 3]
+        scores = preds[:, 4] * preds[:, 5]  # Confidence = Objectness * Class probability
 
         # Filter by confidence threshold (uses instance default or per-call override)
         conf_thresh = self.confidence_threshold if confidence_threshold is None else float(confidence_threshold)
@@ -176,10 +161,10 @@ class ONNXYoloDetector:
         scores = scores[mask]
 
         # Map coordinates back to original image space
-        x1 = (cx - bw / 2.0 - pad_x) / scale
-        y1 = (cy - bh / 2.0 - pad_y) / scale
-        x2 = (cx + bw / 2.0 - pad_x) / scale
-        y2 = (cy + bh / 2.0 - pad_y) / scale
+        x1 = (cx - bw / 2.0) / scale
+        y1 = (cy - bh / 2.0) / scale
+        x2 = (cx + bw / 2.0) / scale
+        y2 = (cy + bh / 2.0) / scale
 
         boxes = np.stack([x1, y1, x2, y2], axis=1)
         boxes[:, [0, 2]] = np.clip(boxes[:, [0, 2]], 0, w0)
