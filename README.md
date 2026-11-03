@@ -1,4 +1,5 @@
 # EIU Automated License Plate Recognition (ALPR) Engine
+[![CI Testing](https://github.com/angweij1431/EIU_YOLO_PaddleOCR_Licenseplatedetection/actions/workflows/ci.yml/badge.svg)](https://github.com/angweij1431/EIU_YOLO_PaddleOCR_Licenseplatedetection/actions/workflows/ci.yml)
 
 Production-grade in-memory Vietnamese license plate detection and character recognition library optimized for edge Central Processing Unit (CPU) deployment.
 
