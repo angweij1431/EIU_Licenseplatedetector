@@ -2,6 +2,16 @@
 import os
 from yolox.exp import Exp as MyExp
 
+# Bypass fast_cocoeval C++ JIT compilation on Windows by forcing standard pycocotools
+try:
+    from pycocotools.cocoeval import COCOeval as _StdCOCOeval
+    import yolox.layers
+    yolox.layers.COCOeval_opt = _StdCOCOeval
+    import yolox.layers.fast_coco_eval_api
+    yolox.layers.fast_coco_eval_api.COCOeval_opt = _StdCOCOeval
+except Exception:
+    pass
+
 
 class Exp(MyExp):
     def __init__(self):
