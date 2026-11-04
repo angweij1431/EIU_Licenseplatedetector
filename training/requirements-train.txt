@@ -6,7 +6,7 @@ albumentations>=1.4.0
 pycocotools>=2.0.7
 onnx>=1.15.0
 onnxruntime>=1.16.0
-onnxsim>=0.4.33
+# onnxsim is omitted on Windows due to 260-char path limit; not needed by our TorchScript ONNX exporter
 pyyaml>=6.0.1
 loguru>=0.7.2
 tabulate>=0.9.0
