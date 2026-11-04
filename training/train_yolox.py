@@ -31,6 +31,12 @@ def main():
         help="Number of GPUs to train on (default: 1)",
     )
     parser.add_argument(
+        "--gpu",
+        type=str,
+        default="0",
+        help="Specific GPU device ID to use (e.g. '0', '1', or '0,1' for multi-GPU; default: '0')",
+    )
+    parser.add_argument(
         "--weights",
         "-c",
         default="yolox_nano.pth",
@@ -66,6 +72,7 @@ def main():
     args = parser.parse_args()
 
     # Pass dynamic settings to experiment file via environment variables
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
     os.environ["YOLOX_EPOCHS"] = str(args.epochs)
     os.environ["YOLOX_DATA_DIR"] = os.path.abspath(args.data_dir)
@@ -75,6 +82,7 @@ def main():
     print("=" * 70)
     print(f"Target Epochs : {args.epochs}")
     print(f"Batch Size    : {args.batch_size}")
+    print(f"Active GPU ID : {args.gpu}")
     print(f"GPU Count     : {args.devices}")
     print(f"Dataset Path  : {os.path.abspath(args.data_dir)}")
     print(f"Experiment    : {args.exp_file}")
