@@ -45,6 +45,13 @@ lab/dataset/CAR MOTOR/
 .idea/
 .env
 
+# Datasets and Training Artifacts
+dataset_coco/
+raw_datasets/
+dataset_unified/
+YOLOX_outputs/
+YOLOX/
+
 # Archive & Temporary Files
 *.zip
 *.log
