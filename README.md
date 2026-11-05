@@ -1,6 +1,8 @@
 # EIU Automated License Plate Recognition (ALPR) Engine
 [![CI Testing](https://github.com/angweij1431/EIU_YOLO_PaddleOCR_Licenseplatedetection/actions/workflows/ci.yml/badge.svg)](https://github.com/angweij1431/EIU_YOLO_PaddleOCR_Licenseplatedetection/actions/workflows/ci.yml)
 
+> **Update (v0.3.0)**: Upgraded detector with 150-epoch retrained YOLOX-Nano weights (peak validation at Epoch 149), achieving 100% positive read rate on the Golden Dataset and resolving high-angle motorcycle detections.
+
 Production-grade in-memory Vietnamese license plate detection and character recognition library optimized for edge Central Processing Unit (CPU) deployment.
 
 Designed for edge worker integration (e.g., CerberusEdge) running Python 3.12 on Linux, with zero external cloud dependencies, zero disk I/O, and zero console logging of Personally Identifiable Information (PII).
@@ -13,7 +15,7 @@ Designed for edge worker integration (e.g., CerberusEdge) running Python 3.12 on
 Install the pre-built standalone wheel package:
 
 ```bash
-pip install dist/eiu_lpr-0.2.0-py3-none-any.whl
+pip install dist/eiu_lpr-0.3.0-py3-none-any.whl
 ```
 
 ### Basic Usage

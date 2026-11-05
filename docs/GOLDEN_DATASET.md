@@ -30,7 +30,7 @@ The suite evaluates five core operating conditions:
 | `golden-10` | `car_sample_29D.jpg` | Automobile (Hatchback) | `29D-110.77` | `29D11077` | Yes | Detected & Recognized | Compact passenger car with commercial D-series registration |
 | `golden-11` | `car_sample_51L.jpg` | Commercial Van | `51L-953.46` | `51L95346` | Yes | Detected & Recognized | Frontal delivery van with modern L-series registration |
 | `golden-12` | `car_test_3.jpg` | Queued Traffic | `29M-6840` | `29M6840` | Yes | Safe Sub-threshold | Vehicle queue at inspection station; foreground sedan plate sub-threshold |
-| `golden-13` | `car_test_7.jpg` | Motorcycle (High Angle) | None | None | No | Zero Candidates | Two touring motorcycles on highway shoulder; steep angle |
+| `golden-13` | `car_test_7.jpg` | Motorcycle (High Angle) | `77C1-444.70` (sec: `77C1-445.76`) | `77C144470` | Yes | Detected & Recognized | Two touring motorcycles on highway shoulder; steep angle (both plates detected in v0.3.0) |
 | `golden-14` | `car_test_8.jpg` | Motorcycle (Rural) | None | None | No | Zero Candidates | Motorcycle parked in rural landscape beside field and mountain |
 | `golden-15` | `car_very_angled.jpg` | Light Truck | None | None | No | Zero Candidates | Angled driving school truck with 'TẬP LÁI' sign masking bumper plate |
 | `golden-16` | `neg_sample_test_1.jpg` | Negative Scene | None | None | No | Zero Candidates | Open sky, clouds, and tree landscape (0 false detections) |

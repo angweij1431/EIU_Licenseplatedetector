@@ -2,8 +2,8 @@
 
 ## Model Details
 - Model Name: EIU Automated License Plate Recognition (ALPR) Engine
-- Version: `alpr-v0.2`
-- Detector Architecture: Megvii YOLOX-Nano single-class (`plate`) exported to Open Neural Network Exchange (ONNX) format with in-graph inference decoding.
+- Version: `alpr-v0.3`
+- Detector Architecture: Megvii YOLOX-Nano single-class (`plate`) exported to Open Neural Network Exchange (ONNX) format with in-graph inference decoding (150-epoch retrained weights on dedicated server, peak validation at Epoch 149 with mAP@50:95 of 0.668).
 - Recognizer Architecture: Compact Convolutional Transformer (CCT-XS) Optical Character Recognition (OCR) model in ONNX format.
 - License: Apache 2.0 (Detector architecture and weights), MIT License (Pipeline framework and OCR model).
 
@@ -13,7 +13,7 @@ The release model assets are located in `models/` and verified with SHA-256 hash
 
 | File Name | Framework | Size | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
-| `detector.onnx` | ONNX Runtime | 8.7 MB | `8c303c836e1abbcb336e514dda4999fd69c770c4b683be617d9c32998dead8e6` |
+| `detector.onnx` | ONNX Runtime | 8.7 MB | `412a566f1bb1187e5f9bd66f33312fcc2fa2fb346ee5ddda5484342f773613ca` |
 | `cct_xs.onnx` | ONNX Runtime | 3.2 MB | `8031afb5fdc6b4d80462c9d542f1284ebd2cfddf5dbacd62609848d7e2855f44` |
 | `cct_xs_plate_config.yaml` | YAML Config | 1.7 KB | `0335c74a305173bb6f393efed0fde03cadeaa0b649ed8e19f431016d8232d0a6` |
 

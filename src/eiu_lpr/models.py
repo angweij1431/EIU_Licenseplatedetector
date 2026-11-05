@@ -5,7 +5,7 @@ import numpy as np
 
 # Default schema and model version identifiers
 SCHEMA_VERSION = "1.0"
-DEFAULT_MODEL_VERSION = "alpr-v0.2"
+DEFAULT_MODEL_VERSION = "alpr-v0.3"
 
 
 @dataclass(frozen=True)

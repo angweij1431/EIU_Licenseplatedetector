@@ -1,5 +1,6 @@
 # License Plate Detector Training (YOLOX)
 
+[UPDATE FROM: 5/11 - Released 150-epoch retrained YOLOX-Nano detector (peak validation at Epoch 149 with mAP@50:95 of 0.668, achieving 100% Golden Dataset accuracy).]
 [UPDATE FROM: 2/11 - Training YOLOX (Under apache 2.0 license)]
 
 ---

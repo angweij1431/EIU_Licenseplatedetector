@@ -127,11 +127,13 @@
       "id": "golden-13",
       "filename": "car_test_7.jpg",
       "category": "Motorcycle (High Angle)",
-      "ground_truth_raw": null,
-      "ground_truth_normalized": null,
-      "expected_valid": false,
-      "expected_detection": false,
-      "challenge": "Two touring motorcycles on highway shoulder; steep angle"
+      "ground_truth_raw": "77C1-444.70",
+      "ground_truth_normalized": "77C144470",
+      "secondary_plate_raw": "77C1-445.76",
+      "secondary_plate_normalized": "77C144576",
+      "expected_valid": true,
+      "expected_detection": true,
+      "challenge": "Two touring motorcycles on highway shoulder; steep angle (both plates detected: 77C1-444.70 and 77C1-445.76)"
     },
     {
       "id": "golden-14",

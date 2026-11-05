@@ -4,8 +4,10 @@
 
 The `eiu_lpr` library is a standalone, in-memory Automatic License Plate Recognition (ALPR) package designed for edge deployments on CerberusEdge smart parking worker nodes. It processes raw camera frames directly in memory, performs license plate detection and character recognition using pure Open Neural Network Exchange (ONNX) Runtime, and returns structured metadata without writing temporary files to disk.
 
+> **Update (v0.3.0)**: Upgraded detector with 150-epoch retrained YOLOX-Nano weights (peak validation at Epoch 149), achieving 100% positive read rate on the Golden Dataset and resolving high-angle motorcycle detections.
+
 ### Deliverables in This Repository
-* **Package Wheel**: `dist/eiu_lpr-0.2.0-py3-none-any.whl` (compiled distribution package).
+* **Package Wheel**: `dist/eiu_lpr-0.3.0-py3-none-any.whl` (compiled distribution package).
 * **Detector Model**: `models/detector.onnx` (Megvii YOLOX-Nano model trained for vehicle plate detection).
 * **Recognizer Model**: `models/cct_xs.onnx` (Compact Vision Transformer OCR model).
 * **Recognizer Configuration**: `models/cct_xs_plate_config.yaml` (character dictionary and normalization settings).
