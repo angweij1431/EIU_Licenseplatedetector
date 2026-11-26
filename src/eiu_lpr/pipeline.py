@@ -94,6 +94,10 @@ class LPRPipeline:
         else:
             raise InvalidInputError(f"Invalid bbox format: expected BoundingBox or 4-element sequence, got {bbox}.")
 
+        fmt = color_format.upper()
+        if fmt not in ("RGB", "BGR"):
+            raise InvalidInputError(f"Unsupported color_format '{color_format}'. Must be 'RGB' or 'BGR'.")
+
         # Crop plate with dynamic 4% padding (3px to 12px)
         crop = PlatePreprocessor.crop_plate(
             image=image,
@@ -119,18 +123,20 @@ class LPRPipeline:
                 debug_crop=crop if include_debug_crop else None,
             )
 
-        # Mild adaptive enhancement for blurry or low-res crops
+        # Adaptive enhancement triggered only when crop is genuinely blurred (always operate in RGB)
         pass_level = "base_640px"
         work_crop = crop
+        ocr_color_format = fmt
         if self.enable_adaptive_enhancement:
-            crop_h, crop_w = crop.shape[:2]
-            blur_score = PlatePreprocessor.compute_blur_score(crop)
-            if crop_w < 110 or crop_h < 60 or blur_score < 150.0:
-                work_crop = PlatePreprocessor.mild_enhance_for_transformer(crop)
+            crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB) if fmt == "BGR" else crop
+            blur_score = PlatePreprocessor.compute_blur_score(crop_rgb)
+            if blur_score < 150.0:
+                work_crop = PlatePreprocessor.mild_enhance_for_transformer(crop_rgb)
+                ocr_color_format = "RGB"
                 pass_level = "enhanced_crop"
 
         # Optical character recognition
-        ocr_result = self.recognizer.recognize_crop(work_crop, color_format=color_format)
+        ocr_result = self.recognizer.recognize_crop(work_crop, color_format=ocr_color_format)
         raw_text = ocr_result["raw_text"]
 
         # Circular 24/2023 normalization & validation

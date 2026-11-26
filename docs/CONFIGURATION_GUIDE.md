@@ -166,8 +166,9 @@ pipeline = LPRPipeline(
     max_detections=10,
     ocr_mean_threshold=0.70,
     ocr_min_threshold=0.50,
+    enable_adaptive_enhancement=True,
     intra_op_threads=None,
-    model_version="alpr-v0.2",
+    model_version="alpr-v0.3",
     schema_version="1.0",
 )
 ```
@@ -182,8 +183,9 @@ pipeline = LPRPipeline(
 | `max_detections` | `int` | `10` | Maximum candidate boxes retained after NMS per frame. |
 | `ocr_mean_threshold` | `float` | `0.70` | Expected mean character confidence score. |
 | `ocr_min_threshold` | `float` | `0.50` | Lowest acceptable character probability threshold. |
+| `enable_adaptive_enhancement` | `bool` | `True` | Runs Retinex/CLAHE/stroke enhancement only on genuinely blurry crops (`blur_score < 150.0`), skipping sharp small crops to avoid distorting tight dual-line motorcycle digits. |
 | `intra_op_threads` | `int` | `None` | Optional CPU core limit for ONNX Runtime. |
-| `model_version` | `str` | `"alpr-v0.2"` | Model version tag included in telemetry output. |
+| `model_version` | `str` | `"alpr-v0.3"` | Model version tag included in telemetry output. |
 | `schema_version` | `str` | `"1.0"` | Schema version tag included in telemetry output. |
 
 ### Available Methods

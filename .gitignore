@@ -59,3 +59,7 @@ lab/benchmarks/verify_latency.py
 
 # Local Working Notes & Checklists
 checklist.md
+
+# Local Field Deployment Samples (PII) & Windows ADS Metadata
+test_images/actual*
+*:Zone.Identifier

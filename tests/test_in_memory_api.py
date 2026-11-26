@@ -127,6 +127,38 @@ class TestInMemoryAPI(unittest.TestCase):
         self.assertTrue(res2["is_valid"])
         self.assertEqual(res2["vehicle_type"], "automobile")
 
+    def test_schema_v1_0_unchanged(self):
+        car_img = cv2.imread(TEST_IMG_PATH)
+        car_res = self.pipeline.process(car_img, color_format="BGR", request_id="schema-check")
+        payload = car_res.to_dict(minimal=True)
+
+        self.assertEqual(payload["schema_version"], "1.0")
+        self.assertEqual(
+            set(payload.keys()),
+            {"schema_version", "request_id", "status", "candidates", "model_version", "processing_time_ms"},
+        )
+        self.assertEqual(
+            set(payload["candidates"][0].keys()),
+            {"plate", "raw_plate", "confidence", "detection_confidence", "bbox"},
+        )
+
+    def test_adaptive_enhancement_blur_only_trigger(self):
+        self.assertTrue(self.pipeline.enable_adaptive_enhancement)
+
+        # Sharp downscaled bike image should NOT trigger enhanced_crop solely due to small bbox size
+        bike_img = cv2.imread("test_images/bike_test_9.jpg")
+        sharp_cands = self.pipeline.recognize(bike_img, color_format="BGR")
+        self.assertGreaterEqual(len(sharp_cands), 1)
+        self.assertEqual(sharp_cands[0].pass_level, "base_640px")
+
+        # Genuinely blurred crop (blur_score < 150) SHOULD trigger enhanced_crop cleanly on BGR input
+        car_img = cv2.imread(TEST_IMG_PATH)
+        boxes = self.pipeline.detect(car_img, color_format="BGR")
+        self.assertGreaterEqual(len(boxes), 1)
+        blurred_car = cv2.GaussianBlur(car_img, (9, 9), 2.5)
+        blur_cand = self.pipeline.read_plate(blurred_car, boxes[0], color_format="BGR")
+        self.assertEqual(blur_cand.pass_level, "enhanced_crop")
+
 
 if __name__ == "__main__":
     unittest.main()

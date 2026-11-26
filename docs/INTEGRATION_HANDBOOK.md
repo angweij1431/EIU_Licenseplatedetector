@@ -151,6 +151,12 @@ pipeline = LPRPipeline(
 ### How do I eliminate startup latency spikes?
 Run `pipeline.warmup(iterations=2)` immediately after instantiating `LPRPipeline`. This forces ONNX Runtime to allocate memory tensors and build execution kernels before the first live vehicle frame arrives.
 
+### When does `enable_adaptive_enhancement` trigger?
+`enable_adaptive_enhancement` is enabled (`True`) by default, and triggers `PlatePreprocessor.mild_enhance_for_transformer()` **only when a plate crop is genuinely blurred (`blur_score < 150.0`)**.
+- **Why blur-only (not crop size)**: Field testing on sharp downscaled overhead motorcycle feeds (e.g., `1024x576`, where plate crops are ~`63x53` px but sharp with `blur_score > 7000`) showed that running 2x2 morphological stroke erosion on sharp small crops distorted tight dual-line characters (`7` into `1`, `E` into `G`).
+- **Channel safety**: `pipeline.read_plate()` converts `BGR` crops to `RGB` before computing blur scores and applying Retinex/CLAHE enhancement.
+- **Best practice**: Feed native camera resolution whenever possible; set `enable_adaptive_enhancement=False` only if you want raw crops in all conditions.
+
 ---
 
 ## 3. What About This? What to Do About This? (Edge Cases & Caveats)
@@ -234,4 +240,66 @@ Copy the `.whl` from `dist/` and install on the target edge host:
 ```bash
 pip install --upgrade eiu_lpr-0.2.0-py3-none-any.whl
 ```
+
+---
+
+## 5. Optional Future Extensions (Copy-Paste Templates — On Hold)
+
+These patterns are intentionally kept **outside** `eiu_lpr` core to avoid overengineering. Paste and adapt them into your edge worker later if needed.
+
+### A. Lane ROI Overlap Filter (Ignore Adjacent Lanes / Pedestrians Outside Lane)
+Filter `pipeline.detect()` boxes or `result.candidates` against a lane Region of Interest (`roi = (rx1, ry1, rx2, ry2)` in original image pixels):
+
+```python
+def is_inside_roi(bbox, roi, min_overlap_ratio=0.5):
+    """Returns True if at least min_overlap_ratio of bbox area lies inside roi."""
+    x1, y1, x2, y2 = bbox
+    rx1, ry1, rx2, ry2 = roi
+
+    ix1, iy1 = max(x1, rx1), max(y1, ry1)
+    ix2, iy2 = min(x2, rx2), min(y2, ry2)
+    inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    box_area = max(1e-6, (x2 - x1) * (y2 - y1))
+    return (inter / box_area) >= min_overlap_ratio
+
+# Example usage (tune LANE_ROI to your camera's pixel coordinates, e.g. 2880x1620):
+LANE_ROI = (1000, 400, 1900, 1300)
+result = pipeline.process(frame, color_format="BGR")
+lane_candidates = [c for c in result.candidates if is_inside_roi(c.bbox, LANE_ROI)]
+```
+
+### B. Motion-Burst Best-Frame Selector (Multi-Shot Motion Trigger)
+If the edge worker buffers multiple frames while motion occurs and selects a winner when motion stops, rank candidate frames by **plate validity and minimum character confidence** rather than pixel sharpness alone (which helps avoid frames where an overhanging taillight occludes the top row):
+
+```python
+def select_best_burst_result(pipeline, frames, color_format="BGR", lane_roi=None):
+    """Evaluates a small burst (e.g., top 3-5 frames) and returns the strongest read."""
+    best_result = None
+    best_score = (-1, -1.0, -1.0)  # (is_valid, ocr_min_confidence, ocr_confidence)
+
+    for frame in frames:
+        res = pipeline.process(frame, color_format=color_format)
+        cands = res.candidates
+        if lane_roi is not None:
+            cands = [c for c in cands if is_inside_roi(c.bbox, lane_roi)]
+
+        if not cands:
+            continue
+
+        top = max(cands, key=lambda c: (int(c.is_valid), c.ocr_min_confidence, c.ocr_confidence))
+        score = (int(top.is_valid), top.ocr_min_confidence, top.ocr_confidence)
+        if score > best_score:
+            best_score = score
+            best_result = res
+
+    return best_result
+```
+
+### C. Future Option: Adding `vehicle_class` to Telemetry JSON (On Hold)
+The current production schema (`1.0`) intentionally omits `vehicle_class` to keep the edge contract unchanged. Note the key findings if you revisit adding vehicle classification later:
+1. **Current `models/detector.onnx` (`v0.3.0`) is plate-only**: Its ONNX output tensor is `[1, 8400, 6]` (`num_classes = 1`, `plate` only), so it cannot visually detect vehicle bodies (`motorcycle` / `car`).
+2. **Off-the-shelf COCO models fail on steep overhead motorcycle views**: Testing an 80-class COCO Nano model on overhead parking-lane shots yielded `motorcycle` confidence of `0.005–0.097` on 3 of 4 motorcycles because riders obscure the bike body from above.
+3. **Two future paths if needed**:
+   - **Zero-model (plate-inferred)**: Expose `vehicle_type` from [validator.py](../src/eiu_lpr/validator.py) using Circular 24/2023 digit lengths (`{4,5}`) plus plate bounding-box aspect ratio (`w/h < 1.65`) for 8-char disambiguation. Zero latency cost, but cannot detect plate-less vehicles and can mislabel heavily angled square 2-line car plates as `"motorcycle"`.
+   - **True visual vehicle detection (for retaining plate-less vehicles)**: Fine-tune a lightweight Apache 2.0 `yolox_nano` on ~300–500 labeled frames from the target overhead camera (or lower camera pitch to 15°–30° so standard COCO models regain recall) and load it as an optional pre-capture gate (`detect_vehicles()`).
 

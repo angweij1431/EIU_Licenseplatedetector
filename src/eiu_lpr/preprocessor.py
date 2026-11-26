@@ -85,7 +85,9 @@ class PlatePreprocessor:
 
         return crop_rgb
 
-    # Mild contrast and edge enhancement tailored for CCT-XS Vision Transformer (RGB)
+    # Mild contrast and edge enhancement tailored for CCT-XS Vision Transformer (expects RGB).
+    # Triggered by LPRPipeline only when Laplacian blur_score < 150.0 (skipped on sharp small
+    # crops so morphological erosion does not distort tight dual-line motorcycle digits).
     @staticmethod
     def mild_enhance_for_transformer(crop_rgb: np.ndarray) -> np.ndarray:
         if crop_rgb is None or crop_rgb.size == 0:

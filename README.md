@@ -1,7 +1,7 @@
 # EIU Automated License Plate Recognition (ALPR) Engine
 [![CI Testing](https://github.com/angweij1431/EIU_YOLO_PaddleOCR_Licenseplatedetection/actions/workflows/ci.yml/badge.svg)](https://github.com/angweij1431/EIU_YOLO_PaddleOCR_Licenseplatedetection/actions/workflows/ci.yml)
 
-> **Update (v0.3.0)**: Upgraded detector with 150-epoch retrained YOLOX-Nano weights (peak validation at Epoch 149), achieving 100% positive read rate on the Golden Dataset and resolving high-angle motorcycle detections.
+> **Update (v0.3.1)**: Fixed adaptive crop enhancement to trigger on blur only (`blur_score < 150.0`) with proper `BGR`→`RGB` normalization (eliminating stroke distortion on sharp downscaled motorcycle plates) while keeping JSON schema `1.0` and `alpr-v0.3` weights unchanged. See [Release Notes v0.3.1](docs/RELEASE_NOTES_v0.3.1.md).
 
 Production-grade in-memory Vietnamese license plate detection and character recognition library optimized for edge Central Processing Unit (CPU) deployment.
 
@@ -15,7 +15,7 @@ Designed for edge worker integration (e.g., CerberusEdge) running Python 3.12 on
 Install the pre-built standalone wheel package:
 
 ```bash
-pip install dist/eiu_lpr-0.3.0-py3-none-any.whl
+pip install dist/eiu_lpr-0.3.1-py3-none-any.whl
 ```
 
 ### Basic Usage
@@ -182,6 +182,7 @@ Get-FileHash models/detector.onnx -Algorithm SHA256
 
 ## 4. Documentation Index
 
+- [Release Notes v0.3.1](docs/RELEASE_NOTES_v0.3.1.md): Blur-only preprocessor fix, BGR-to-RGB normalization, and documented future options.
 - [Release Notes v0.2.0](docs/RELEASE_NOTES_v0.2.0.md): Migration changelog, benchmarks, and known edge-case trade-offs.
 - [Configuration Guide](docs/CONFIGURATION_GUIDE.md): Parameters, thresholds, and full method signatures.
 - [Integration Handbook](docs/INTEGRATION_HANDBOOK.md): Operational FAQs, troubleshooting, and step-by-step versioning runbook.
